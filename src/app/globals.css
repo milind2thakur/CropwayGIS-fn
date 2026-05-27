@@ -3,15 +3,62 @@
 @tailwind utilities;
 
 :root {
-  --canvas: #f2f2f2;
-  --panel: #f9faf7;
-  --line: #dbe3d3;
-  --ink: #23311f;
-  --muted: #75806f;
+  /* ── Surface & Structure ─────────────────────────────────────────── */
+  --canvas: #f2f2f2;        /* page background */
+  --panel: #f9faf7;         /* card / sidebar surfaces */
+  --surface: #f4f7fa;       /* input fields, table headers, dropdowns */
+  --white: #ffffff;
+
+  /* ── Borders & Lines ─────────────────────────────────────────────── */
+  --line: #dbe3d3;          /* standard divider */
+  --line-light: #dadada;    /* lighter border */
+  --line-soft: #d5dad3;     /* subtle divider (Gantt / scrollbar track) */
+
+  /* ── Ink (Text) ──────────────────────────────────────────────────── */
+  --ink: #23311f;           /* primary brand text */
+  --ink-base: #1e1e1e;      /* neutral near-black (UI labels, inputs) */
+  --ink-dark: #222222;      /* pure dark (SVG icons, chart axes) */
+  --muted: #75806f;         /* secondary / placeholder text */
+
+  /* ── Brand Green ─────────────────────────────────────────────────── */
   --moss: #345c24;
   --moss-soft: #63804f;
   --moss-pale: #dde8d5;
   --wheat: #fbf6de;
+  --green-light: #edf2ea;
+  --green-light-hover: #e3ecdf;
+  --green-light-active: #c6d8bd;
+  --green-normal: #47802b;
+  --green-normal-hover: #407327;
+  --green-normal-active: #396622;
+  --green-dark: #356020;
+  --green-dark-hover: #2b4d1a;
+  --green-dark-active: #203a13;
+  --green-darker: #192d0f;
+
+  /* ── Accent Greens (chart / map overlays) ────────────────────────── */
+  --green-muted: #8cb584;   /* secondary chart line / polyline strokes */
+  --green-pale: #a0be8c;    /* illustration / map polygon fill */
+
+  /* ── Brand Yellow ────────────────────────────────────────────────── */
+  --yellow-light: #fefcf2;
+  --yellow-light-hover: #fdfaec;
+  --yellow-light-active: #fbf4d7;
+  --yellow-normal: #f3dd7e;
+  --yellow-normal-hover: #dbc771;
+  --yellow-normal-active: #c2b165;
+  --yellow-dark: #b6a65f;
+  --yellow-dark-hover: #92854c;
+  --yellow-dark-active: #6d6339;
+  --yellow-darker: #554d2c;
+
+  /* ── Semantic / Status ───────────────────────────────────────────── */
+  --warning: #ffcf00;       /* alert triangle fill (monitoring icons) */
+
+  /* ── Neutral UI ──────────────────────────────────────────────────── */
+  --icon-neutral: #7e869e;  /* avatar background, neutral icon fill */
+
+  /* ── Typography ──────────────────────────────────────────────────── */
   --font-plus-jakarta: 'Plus Jakarta Sans';
 }
 
@@ -26,7 +73,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background: #f2f2f2;
+  background: var(--canvas);
   color: var(--ink);
 }
 
@@ -39,4 +86,26 @@ button,
 input,
 select {
   font: inherit;
+}
+
+/* Suppress browser default focus rings inside glassmorphism map overlays */
+.map-overlay-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Custom scrollbar to fix default Windows scrollbar artifacts */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
 }

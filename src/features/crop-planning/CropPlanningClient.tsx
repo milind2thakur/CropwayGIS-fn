@@ -2,11 +2,12 @@
 
 import { useDeferredValue, useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Search, X } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { calculateCropPlan, getCrops, getSeasons, getUnits } from '@/lib/api/crop-planning';
 import { nextStepHref } from '@/features/shell/config';
+import { Button } from '@/components/ui/button';
 
 import { useCropPlanDraft } from './useCropPlanDraft';
 
@@ -26,31 +27,34 @@ function CropChip({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-[10px] px-[13px] py-[9px] text-left transition ${
+      className={`relative flex h-[33px] min-w-[156px] w-auto items-center gap-[6px] rounded-[10px] pl-[12px] pr-[30px] text-left transition ${
         selected
-          ? 'bg-[#356020] text-white'
-          : 'bg-[#EDF2EA] text-[#1E1E1E] hover:bg-[#e0e8dc]'
+          ? 'bg-greenDark text-white'
+          : 'bg-greenLight text-ink hover:bg-greenLightHover'
       }`}
     >
-      <span className="font-montserrat text-[12px] font-medium leading-tight">{label}</span>
-      <span className={`font-montserrat text-[10px] font-bold leading-tight ${selected ? 'text-white opacity-50' : 'text-[#1E1E1E] opacity-50'}`}>{meta}</span>
+      <span className="font-montserrat text-[12px] font-medium leading-[130%] whitespace-nowrap">{label}</span>
+      <span className="font-montserrat text-[10px] font-bold leading-[130%] opacity-50 whitespace-nowrap">{meta}</span>
       {onRemove ? (
         <span
           onClick={(event) => {
             event.stopPropagation();
             onRemove();
           }}
-          className={`flex h-[15px] w-[15px] items-center justify-center rounded-full bg-white/20 ml-[3px]`}
+          className="absolute right-[9px] top-1/2 -translate-y-1/2 flex h-[15px] w-[15px] items-center justify-center rounded-[2px] bg-white/20 -rotate-45"
         >
-          <X className="h-2 w-2 text-white" strokeWidth={3} />
+          <span className="relative h-[8px] w-[8px]">
+            <span className="absolute left-1/2 top-0 h-full w-[1.2px] -translate-x-1/2 rounded-[2px] bg-white" />
+            <span className="absolute left-0 top-1/2 h-[1.2px] w-full -translate-y-1/2 rounded-[2px] bg-white" />
+          </span>
         </span>
       ) : (
         <span
-          className={`flex h-[15px] w-[15px] items-center justify-center rounded-full bg-white/20 ml-[3px]`}
+          className="absolute right-[9px] top-1/2 -translate-y-1/2 flex h-[15px] w-[15px] items-center justify-center rounded-[2px] bg-black/5"
         >
-          <span className="relative h-2 w-2">
-            <span className="absolute left-1/2 top-0 h-full w-[1.2px] -translate-x-1/2 rounded-full bg-white" />
-            <span className="absolute left-0 top-1/2 h-[1.2px] w-full -translate-y-1/2 rounded-full bg-white" />
+          <span className="relative h-[8px] w-[8px]">
+            <span className="absolute left-1/2 top-0 h-full w-[1.2px] -translate-x-1/2 rounded-[2px] bg-black/40" />
+            <span className="absolute left-0 top-1/2 h-[1.2px] w-full -translate-y-1/2 rounded-[2px] bg-black/40" />
           </span>
         </span>
       )}
@@ -119,23 +123,25 @@ export function CropPlanningClient() {
   const availableCrops = cropsQuery.data?.data ?? [];
   const selectedCropIds = new Set(state.lines.map((line) => line.cropId));
   const calculation = calculationEnvelope?.data;
+  const shouldScrollCalculator = state.lines.length > 4;
 
   return (
-    <div className="w-full h-full bg-white relative p-[17px]">
-      <div className="flex flex-col">
-        <div>
-          <h1 className="font-montserrat text-[14px] font-medium text-black">Plan Crop</h1>
-          <div className="mt-[16px] flex items-center gap-[19px]">
-              <div className="relative w-[272px] h-[28px] shrink-0">
+    <div className="h-full w-full overflow-hidden bg-canvas p-5 lg:p-6">
+      <div className="relative flex h-full w-full flex-col overflow-hidden rounded-[16px] border border-black/10 bg-white p-6 shadow-sm lg:p-8">
+        <div className="flex flex-col h-full min-h-0">
+          <div className="shrink-0">
+            <h1 className="font-montserrat text-[14px] font-medium text-black">Plan Crop</h1>
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
+              <div className="relative h-[28px] w-[272px] shrink-0">
                 <input
                   value={state.search}
                   onChange={(event) => dispatch({ type: 'setSearch', payload: event.target.value })}
                   placeholder="Search Crop"
-                  className="h-full w-full rounded-[13px] border border-[#DADADA] bg-white pl-[10px] pr-[30px] font-montserrat text-[10px] font-medium text-[#222222] outline-none placeholder:text-[#222222] placeholder:opacity-50"
+                  className="h-full w-full rounded-[13px] border border-greenLightActive bg-white pl-[10px] pr-[30px] font-montserrat text-[10px] font-medium text-ink outline-none placeholder:text-ink/50"
                 />
-                <Search className="pointer-events-none absolute right-[10px] top-1/2 h-3 w-3 -translate-y-1/2 text-[#222222]" />
+                <Search className="pointer-events-none absolute right-[10px] top-1/2 h-3 w-3 -translate-y-1/2 text-ink" />
               </div>
-              <div className="flex h-[26px] items-center gap-[2px] rounded-[8px] bg-[#EDF2EA] p-[2px]">
+              <div className="flex h-[26px] items-center gap-[2px] rounded-[8px] bg-greenLight p-[2px]">
                 {(seasonsQuery.data?.data ?? [
                   { id: 'kharif', label: 'Kharif' },
                   { id: 'rabi', label: 'Rabi' },
@@ -143,7 +149,7 @@ export function CropPlanningClient() {
                   <button
                     key={season.id}
                     className={`flex h-[22px] items-center justify-center rounded-[6px] px-[30px] font-montserrat text-[12px] font-medium transition ${
-                      state.season === season.id ? 'bg-[#203A13] text-white' : 'text-[#203A13]'
+                      state.season === season.id ? 'bg-greenDarkActive text-white' : 'text-greenDarkActive'
                     }`}
                     onClick={() => dispatch({ type: 'setSeason', payload: season.id })}
                   >
@@ -152,14 +158,16 @@ export function CropPlanningClient() {
                 ))}
               </div>
             </div>
-        </div>
-
-        <div className="mt-[30px] flex flex-col">
-          <div className="flex items-center gap-[8px]">
-            <div className="font-montserrat text-[12px] font-medium text-black opacity-60">Select Crop type</div>
-            <div className="h-[1px] flex-1 bg-black/20"></div>
           </div>
-          <div className="mt-[16px] flex flex-wrap gap-[19px]">
+
+          <div className="mt-5 shrink-0 rounded-[20px] border border-greenLight bg-white px-6 py-5 shadow-[0_1px_0_rgba(0,0,0,0.02)] lg:px-8">
+            <div className="flex items-center gap-[8px]">
+              <div className="font-montserrat text-[12px] font-semibold leading-[130%] text-black/60 whitespace-nowrap">
+                Select Crop Type
+              </div>
+              <div className="h-0 flex-1 border-t border-black/12"></div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
               {state.lines.map((line) => (
                 <CropChip
                   key={line.cropId}
@@ -182,46 +190,47 @@ export function CropPlanningClient() {
                         payload: { crop, defaultUnit: units[0]?.id ?? 'acre' },
                       })
                     }
-                  />
+                    />
                 ))}
             </div>
           </div>
 
-        <div className="mt-[40px] flex flex-col">
-          <div className="h-[1px] w-full bg-black/20 mb-[36px]"></div>
-          <div className="mb-[26px] font-montserrat text-[12px] font-medium text-black">Compleate cost Calculator</div>
+          <div className="mt-5 flex min-h-0 flex-1 flex-col rounded-[24px] border border-greenLight bg-panel px-6 py-5 lg:px-8 lg:py-6">
+            <div className="mb-4 shrink-0 font-montserrat text-[12px] font-semibold text-black/70">Complete Cost Calculator</div>
             {state.lines.length ? (
-              <div className="w-full">
-                <div className="overflow-x-auto">
+              <div className="w-full flex-1 min-h-0 overflow-hidden flex flex-col">
+                <div
+                  className={`rounded-[18px] ${shouldScrollCalculator ? 'max-h-[420px] overflow-auto min-h-0' : 'overflow-x-auto overflow-y-visible'}`}
+                >
                   <table className="min-w-[1160px] w-full border-separate border-spacing-0">
                     <thead>
                       <tr>
-                        <th colSpan={3} className="p-0 border-b border-transparent"></th>
+                        <th colSpan={3} className="border-b border-transparent bg-panel p-0"></th>
                         <th 
                           colSpan={calculation?.components?.length ?? 1} 
-                          className="bg-[#FBF4D7] border border-[#C2B165] border-b-0 rounded-t-[20px] py-[6px] font-montserrat text-[10px] font-medium text-black/70 text-center"
+                          className="rounded-t-[20px] border border-yellowNormalActive border-b-0 bg-yellowLightActive py-[6px] text-center font-montserrat text-[10px] font-medium text-ink/70"
                         >
                           Est. cost Breakdown
                         </th>
-                        <th className="p-0 border-b border-transparent"></th>
+                        <th className="border-b border-transparent bg-panel p-0"></th>
                       </tr>
                       <tr>
-                        <th className="px-[17px] pb-[26px] pt-[20px] text-left font-montserrat text-[10px] font-medium text-black/70 align-bottom border-b border-black/20">Selected Crop</th>
-                        <th className="px-[17px] pb-[26px] pt-[20px] text-left font-montserrat text-[10px] font-medium text-black/70 align-bottom border-b border-black/20">Area</th>
-                        <th className="px-[17px] pb-[26px] pt-[20px] text-left font-montserrat text-[10px] font-medium text-black/70 align-bottom border-b border-black/20">Unit</th>
+                        <th className="align-bottom border-b border-black/20 bg-panel px-[17px] pb-[26px] pt-[20px] text-left font-montserrat text-[10px] font-medium text-ink/70">Selected Crop</th>
+                        <th className="align-bottom border-b border-black/20 bg-panel px-[17px] pb-[26px] pt-[20px] text-left font-montserrat text-[10px] font-medium text-ink/70">Area</th>
+                        <th className="align-bottom border-b border-black/20 bg-panel px-[17px] pb-[26px] pt-[20px] text-left font-montserrat text-[10px] font-medium text-ink/70">Unit</th>
                         {(calculation?.components ?? []).map((component, idx, arr) => (
                           <th 
                             key={component.key} 
                             className={`px-2 pb-[26px] pt-[20px] text-center font-montserrat text-[10px] font-medium text-black/70 align-bottom bg-white border-b border-black/20 ${
-                              idx === 0 ? 'border-l border-[#C2B165]' : ''
+                              idx === 0 ? 'border-l border-yellowNormalActive' : ''
                             } ${
-                              idx === arr.length - 1 ? 'border-r border-[#C2B165]' : ''
+                              idx === arr.length - 1 ? 'border-r border-yellowNormalActive' : ''
                             }`}
                           >
                             {component.label}
                           </th>
                         ))}
-                        <th className="px-[17px] pb-[26px] pt-[20px] text-left font-montserrat text-[10px] font-medium text-black/70 align-bottom border-b border-black/20">Total Cost Inr</th>
+                        <th className="align-bottom border-b border-black/20 bg-panel px-[17px] pb-[26px] pt-[20px] text-left font-montserrat text-[10px] font-medium text-ink/70">Total Cost Inr</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -234,7 +243,7 @@ export function CropPlanningClient() {
                               <div className="font-montserrat text-[14px] font-medium text-black">{line.cropName}</div>
                             </td>
                             <td className="px-[17px] py-[35px] border-b border-black/10">
-                              <div className="flex h-[30px] w-[43px] items-center justify-center rounded-[8px] bg-[#F4F7FA]">
+                              <div className="flex h-[30px] w-[43px] items-center justify-center rounded-[8px] bg-panel">
                                 <input
                                   min={0.1}
                                   step={0.1}
@@ -249,12 +258,12 @@ export function CropPlanningClient() {
                                       },
                                     })
                                   }
-                                  className="w-full bg-transparent text-center font-poppins text-[12px] text-[#1E1E1E] outline-none"
+                                  className="w-full bg-transparent text-center font-montserrat text-[12px] font-medium leading-[130%] text-ink outline-none"
                                 />
                               </div>
                             </td>
                             <td className="px-[17px] py-[35px] border-b border-black/10">
-                              <div className="flex h-[30px] w-[86px] items-center rounded-[4px] bg-[#EDF2EA] px-[10px]">
+                              <div className="relative flex h-[30px] w-[86px] items-center rounded-[4px] bg-greenLight">
                                 <select
                                   value={line.unit}
                                   onChange={(event) =>
@@ -263,7 +272,7 @@ export function CropPlanningClient() {
                                       payload: { cropId: line.cropId, unit: event.target.value },
                                     })
                                   }
-                                  className="w-full appearance-none bg-transparent font-montserrat text-[12px] font-medium text-black outline-none"
+                                  className="w-full h-full appearance-none bg-transparent font-montserrat text-[12px] font-medium leading-[130%] text-black outline-none pl-[20px] pr-[30px] cursor-pointer"
                                 >
                                   {units.map((unit) => (
                                     <option key={unit.id} value={unit.id}>
@@ -271,17 +280,27 @@ export function CropPlanningClient() {
                                     </option>
                                   ))}
                                 </select>
+                                <svg 
+                                  width="8" 
+                                  height="5" 
+                                  viewBox="0 0 8 5" 
+                                  fill="none" 
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="pointer-events-none absolute right-[20px] top-1/2 -translate-y-1/2"
+                                >
+                                  <path d="M1 1L4 4L7 1" stroke="#222222" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
                               </div>
                             </td>
                             {(calculation?.components ?? []).map((component, idx, arr) => (
                               <td 
                                 key={component.key} 
                                 className={`px-2 py-[35px] text-center font-montserrat text-[14px] font-medium text-black bg-white ${
-                                  idx === 0 ? 'border-l border-[#C2B165]' : ''
+                                  idx === 0 ? 'border-l border-yellowNormalActive' : ''
                                 } ${
-                                  idx === arr.length - 1 ? 'border-r border-[#C2B165]' : ''
+                                  idx === arr.length - 1 ? 'border-r border-yellowNormalActive' : ''
                                 } ${
-                                  isLastRow ? 'border-b border-[#C2B165]' : 'border-b border-black/10'
+                                  isLastRow ? 'border-b border-yellowNormalActive' : 'border-b border-black/10'
                                 } ${
                                   isLastRow && idx === 0 ? 'rounded-bl-[20px]' : ''
                                 } ${
@@ -292,7 +311,7 @@ export function CropPlanningClient() {
                               </td>
                             ))}
                             <td className="px-[17px] py-[35px] border-b border-black/10">
-                              <div className="inline-flex h-[32px] items-center rounded-[8px] bg-[#EDF2EA] px-3 font-poppins text-[12px] text-[#1E1E1E]">
+                              <div className="inline-flex h-[32px] items-center rounded-[8px] bg-greenLight px-3 font-montserrat text-[12px] font-medium leading-[130%] text-ink">
                                 {row ? `${(row.rowTotal).toLocaleString('en-IN')} /-` : '-'}
                               </div>
                             </td>
@@ -304,32 +323,34 @@ export function CropPlanningClient() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-3xl border border-dashed border-line bg-[#fafcf8] px-6 py-12 text-center text-sm text-muted">
+              <div className="rounded-3xl border border-dashed border-line bg-white px-6 py-12 text-center text-sm text-muted">
                 Search and select a crop to start planning.
               </div>
             )}
 
             {calculationError ? (
-              <div className="mt-4 rounded-2xl border border-[#efc7c7] bg-[#fff4f4] px-4 py-3 text-sm text-[#8b3434]">
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {calculationError}
               </div>
             ) : null}
 
-            <div className="mt-[40px] h-[1px] w-full bg-black/20 mb-[5px]"></div>
+            <div className="mt-5 mb-4 h-[1px] w-full shrink-0 bg-black/12 lg:mt-6"></div>
 
-            <div className="flex flex-col items-end gap-[80px]">
+            <div className="flex shrink-0 flex-col items-end gap-5 lg:gap-8">
               <div className="flex flex-col items-start gap-[8px]">
-                <div className="font-montserrat text-[12px] font-medium text-black">Grand totel</div>
-                <div className="flex h-[37px] min-w-[140px] items-center justify-start rounded-[8px] bg-[#C6D8BD] px-[12px] py-[7px]">
-                  <span className="font-montserrat text-[18px] font-bold leading-tight text-[#203A13]">
+                <div className="font-montserrat text-[12px] font-medium text-black">Grand Total</div>
+                <div className="flex h-[40px] min-w-[152px] items-center justify-start rounded-[10px] bg-greenLightActive px-[14px] py-[7px]">
+                  <span className="font-montserrat text-[18px] font-bold leading-tight text-greenDarkActive">
                     {calculation ? `${(calculation.grandTotal).toLocaleString('en-IN')} /-` : '0 /-'}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  className="flex h-[26px] w-[110px] items-center justify-center rounded-[6px] bg-[#E3ECDF] transition hover:bg-[#dbe4d7]"
+              <div className="flex items-center gap-2.5">
+                <Button
+                  variant="secondary"
+                  size="medium"
+                  className="w-[110px]"
                   onClick={() => {
                     clearPersistedDraft();
                     dispatch({ type: 'clear' });
@@ -337,19 +358,30 @@ export function CropPlanningClient() {
                     setCalculationError(null);
                   }}
                 >
-                  <span className="font-montserrat text-[12px] font-medium text-[#203A13]">Clear</span>
-                </button>
-                <button
-                  className="flex h-[26px] w-[147px] items-center justify-center rounded-[6px] bg-[#356020] transition hover:bg-[#2e521b] disabled:opacity-50"
+                  Clear
+                </Button>
+                <Button
+                  variant="primary"
+                  size="medium"
+                  className="w-[147px] disabled:opacity-50"
                   onClick={() => router.push(nextStepHref)}
                   disabled={!state.lines.length || isPending}
                 >
-                  <span className="font-montserrat text-[12px] font-medium text-white">continue</span>
-                </button>
+                  continue
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="medium"
+                  className="w-[110px] border border-greenDark/20 bg-white text-greenDark"
+                  onClick={() => router.push(nextStepHref)}
+                >
+                  Skip
+                </Button>
               </div>
             </div>
           </div>
         </div>
+      </div>
     </div>
   );
 }

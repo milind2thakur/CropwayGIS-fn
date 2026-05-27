@@ -27,3 +27,12 @@ export function LandIntelligenceIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function CloudAlertsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="80" height="80" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <circle cx="36.5" cy="19.5" r="10" fill="#F3DD7E" stroke="#F3DD7E" strokeWidth="3" strokeDasharray="1 1"/>
+      <path d="M18.417 15.167C24.1818 15.1671 29.1375 18.6307 31.3166 23.5906C31.5137 24.0393 31.6123 24.2636 31.6396 24.3194C32.2046 25.4731 32.9262 25.9442 34.2097 25.9974C34.2718 26 34.4035 26 34.667 26C39.4533 26.0002 43.333 29.8806 43.333 34.667C43.3328 39.4532 39.4532 43.3328 34.667 43.333H19.5197C19.5088 43.333 19.5 43.3242 19.5 43.3133C19.5 43.3018 19.4902 43.2927 19.4788 43.2936C19.1283 43.3197 18.7742 43.333 18.417 43.333C10.639 43.333 4.33301 37.028 4.33301 29.25C4.33301 21.472 10.639 15.167 18.417 15.167Z" fill="white"/>
+    </svg>
+  );
+}

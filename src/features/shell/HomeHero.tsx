@@ -2,12 +2,15 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { MapContainer, Polygon, TileLayer, ZoomControl } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import { LandIntelligenceIcon } from './config';
 const yAxisLabels = ['7.5', '7', '6.5', '6', '5.5', '5', '4.5', '4', '3.5', '3', '2.5'];
 const monthLabels = ['June', 'June', 'June', 'July', 'July', 'July', 'Oct', 'Oct', 'Oct', 'Oct'];
 
 function GreetingPinIcon() {
   return (
-    <svg aria-hidden="true" className="h-6 w-6 shrink-0 text-[#222222]" viewBox="0 0 24 24" fill="currentColor">
+    <svg aria-hidden="true" className="h-6 w-6 shrink-0 text-ink" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 2.75a7 7 0 0 0-7 7c0 4.86 5.49 10.32 6.12 10.92a1.25 1.25 0 0 0 1.76 0C13.51 20.07 19 14.61 19 9.75a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z" />
     </svg>
   );
@@ -15,8 +18,8 @@ function GreetingPinIcon() {
 
 function CropCatalogueCard() {
   return (
-    <div className="h-[308px] w-full rounded-[20px] bg-white shadow-sm border border-line/10">
-      <div className="px-6 py-4 font-montserrat text-[18px] font-medium leading-tight text-[#222222]">
+    <div className="h-[308px] w-full rounded-[24px] border border-black/10 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="px-6 py-5 font-montserrat text-[18px] font-medium leading-[130%] text-ink">
         Crop Catalogue
       </div>
     </div>
@@ -46,28 +49,30 @@ function MapCard() {
     return locationSuggestions.filter((item) => item.toLowerCase().includes(normalizedTerm));
   }, [locationSuggestions, searchTerm]);
 
+  const mapPolygon: [number, number][] = [
+    [21.2519, 81.6301],
+    [21.2527, 81.6307],
+    [21.2519, 81.6315],
+    [21.2510, 81.6307],
+  ];
+
   return (
-    <div className="relative h-[308px] w-full overflow-hidden rounded-[20px] shadow-sm border border-line/10 bg-white">
-      <div className="absolute inset-0 bg-[#f5f5f5]" />
-      <svg viewBox="0 0 487 308" className="absolute inset-0 h-full w-full">
-        <g fill="none" stroke="#ffffff" strokeWidth="4" strokeLinecap="round" opacity="0.95">
-          <path d="M11 27 C87 83, 158 55, 236 99 S374 160, 509 89" />
-          <path d="M-21 92 C72 132, 158 116, 244 162 S402 202, 525 146" />
-          <path d="M14 159 C106 192, 184 174, 279 220 S422 263, 510 235" />
-          <path d="M21 238 C108 267, 171 253, 259 277 S389 297, 495 287" />
-          <path d="M72 -18 C79 57, 61 124, 85 203 S118 296, 137 341" />
-          <path d="M163 -14 C168 42, 135 125, 169 193 S219 289, 263 334" />
-          <path d="M253 -16 C262 58, 227 126, 262 194 S319 283, 369 333" />
-          <path d="M352 -11 C361 52, 328 129, 360 196 S411 283, 458 337" />
-          <path d="M35 54 L214 286" />
-          <path d="M110 17 L381 289" />
-          <path d="M242 1 L472 206" />
-          <path d="M29 120 L444 27" />
-          <path d="M13 286 L286 89" />
-          <path d="M214 262 L487 130" />
-        </g>
-        <path d="M251 189 L306 118 L354 183 L286 226 Z" fill="#a0be8c" stroke="#ffffff" strokeWidth="6" />
-      </svg>
+    <div className="relative h-[308px] w-full overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <MapContainer
+        center={[21.2517, 81.6304]}
+        zoom={15}
+        className="absolute inset-0 h-full w-full"
+        scrollWheelZoom={false}
+        zoomControl={false}
+        attributionControl={false}
+      >
+        <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+        <Polygon
+          positions={mapPolygon}
+          pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#a0be8c', fillOpacity: 0.65 }}
+        />
+        <ZoomControl position="bottomright" />
+      </MapContainer>
 
       {/* Location Bar (Frame 1948761248) */}
       <div className="absolute left-[11px] top-[9px] w-[calc(100%-22px)] max-w-[417px]">
@@ -91,15 +96,15 @@ function MapCard() {
               setTimeout(() => setShowSuggestions(false), 120);
             }}
             placeholder="Search location..."
-            className="w-full min-w-0 bg-transparent font-poppins text-[12px] font-medium leading-none text-black/70 outline-none placeholder:text-black/50"
+            className="w-full min-w-0 bg-transparent font-montserrat text-[12px] font-medium leading-[130%] text-ink/70 outline-none placeholder:text-ink/50"
           />
         </div>
         
         {/* Frame 1261156410 (Close button) */}
         <div className="flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
           <div className="relative h-[13px] w-[13px] rotate-0">
-            <div className="absolute h-full w-px left-1/2 -translate-x-1/2 bg-[#203A13] rotate-45" />
-            <div className="absolute h-full w-px left-1/2 -translate-x-1/2 bg-[#203A13] -rotate-45" />
+            <div className="absolute left-1/2 h-full w-px -translate-x-1/2 rotate-45 bg-greenDarkActive" />
+            <div className="absolute left-1/2 h-full w-px -translate-x-1/2 -rotate-45 bg-greenDarkActive" />
           </div>
         </div>
       </div>
@@ -110,7 +115,7 @@ function MapCard() {
                 <button
                   key={suggestion}
                   type="button"
-                  className="block w-full rounded-[8px] px-3 py-2 text-left font-poppins text-[12px] font-medium text-black/70 transition hover:bg-[#eaf0e5]"
+                  className="block w-full rounded-[8px] px-3 py-2 text-left font-montserrat text-[12px] font-medium leading-[130%] text-ink/70 transition hover:bg-greenLight"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => {
                     setSearchTerm(suggestion);
@@ -121,7 +126,7 @@ function MapCard() {
                 </button>
               ))
             ) : (
-              <div className="px-3 py-2 font-poppins text-[12px] text-black/50">No matches found</div>
+              <div className="px-3 py-2 font-montserrat text-[12px] font-medium leading-[130%] text-ink/50">No matches found</div>
             )}
           </div>
         ) : null}
@@ -133,32 +138,32 @@ function MapCard() {
 
 function ForecastChart() {
   return (
-    <div className="relative h-[392px] w-full rounded-[20px] bg-white shadow-sm border border-line/10 p-6">
-      <div className="flex items-center justify-between mb-8">
+    <div className="relative flex h-[308px] w-full flex-col overflow-hidden rounded-[24px] border border-black/10 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="flex items-center justify-between mb-4 shrink-0">
         <div className="flex items-center gap-2">
-          <h2 className="font-montserrat text-[18px] font-medium leading-tight text-[#222222]">
+          <h2 className="font-montserrat text-[18px] font-medium leading-[130%] text-ink">
             Crop Yield Forecasting
           </h2>
-          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#222222]/10 text-[10px] font-bold text-[#222222]">
-            i
-          </span>
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path opacity="0.5" fillRule="evenodd" clipRule="evenodd" d="M5.5 0C8.53757 0 11 2.46243 11 5.5C11 8.53757 8.53757 11 5.5 11C2.46243 11 0 8.53757 0 5.5C0 2.46243 2.46243 0 5.5 0ZM6.21282 3.7214C6.08033 3.73214 5.95501 3.75005 5.83684 3.77511C5.733 3.7966 5.62737 3.82882 5.51995 3.87179C5.41253 3.91118 5.32301 3.9631 5.25139 4.02755C5.21559 4.05978 5.16367 4.15646 5.09563 4.31759C5.03118 4.47872 4.95778 4.67387 4.87542 4.90304C4.79664 5.13221 4.71608 5.38107 4.63372 5.64962C4.54778 5.91818 4.4708 6.17599 4.40276 6.42306C4.33473 6.66655 4.27923 6.88497 4.23626 7.07833C4.18971 7.27169 4.16643 7.40955 4.16643 7.49191C4.16643 7.5492 4.17001 7.6047 4.17718 7.65841C4.18076 7.71212 4.21298 7.77479 4.27386 7.8464C4.29176 7.8643 4.31324 7.88221 4.33831 7.90011C4.36337 7.9216 4.39023 7.93234 4.41888 7.93234C4.5263 7.93234 4.66057 7.89653 4.82171 7.82492C4.98284 7.7533 5.15293 7.65483 5.33196 7.52951C5.51458 7.4006 5.6972 7.252 5.87981 7.08371C6.06601 6.91183 6.23789 6.72563 6.39544 6.52511L6.27727 6.41769C6.14837 6.57166 6.02304 6.70415 5.9013 6.81515C5.77955 6.92615 5.66676 7.01746 5.56292 7.08908C5.46266 7.16069 5.37314 7.2144 5.29436 7.25021C5.21559 7.28602 5.15472 7.30571 5.11175 7.30929C5.05804 7.30929 5.03118 7.27527 5.03118 7.20724C5.03118 7.17501 5.04371 7.10698 5.06878 7.00314C5.09384 6.89572 5.12786 6.76681 5.17083 6.61642C5.21738 6.46245 5.2693 6.29415 5.32659 6.11154C5.38388 5.92534 5.44475 5.73556 5.50921 5.5422C5.57724 5.34526 5.64528 5.1519 5.71331 4.96212C5.78134 4.77234 5.84759 4.59689 5.91204 4.43576C5.97649 4.27104 6.03557 4.1296 6.08929 4.01144C6.14658 3.89328 6.19492 3.80734 6.2343 3.75363L6.21282 3.7214ZM6.49749 1.83078C6.40439 1.83078 6.31308 1.85584 6.22356 1.90597C6.13404 1.9561 6.05169 2.02234 5.97649 2.1047C5.90488 2.18348 5.8458 2.27479 5.79925 2.37863C5.75628 2.47889 5.73479 2.58094 5.73479 2.68478C5.73479 2.75639 5.74554 2.81548 5.76702 2.86203C5.7885 2.90858 5.81536 2.94617 5.84759 2.97482C5.87981 2.99988 5.91383 3.01779 5.94964 3.02853C5.98903 3.03569 6.02483 3.03927 6.05706 3.03927C6.13225 3.03927 6.21282 3.016 6.29876 2.96945C6.38828 2.9229 6.46884 2.86024 6.54046 2.78146C6.61207 2.70268 6.67115 2.61316 6.7177 2.5129C6.76783 2.40906 6.7929 2.30164 6.7929 2.19064C6.7929 2.07606 6.76246 1.98833 6.70159 1.92746C6.64072 1.863 6.57268 1.83078 6.49749 1.83078Z" fill="#222222"/>
+          </svg>
         </div>
 
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-4 rounded-full bg-[#F3DD7E]" />
-            <span className="text-[10px] font-medium text-[#222222]/60">Predicted</span>
+            <span className="h-2 w-4 rounded-full bg-yellowNormal" />
+            <span className="font-montserrat text-[10px] font-medium leading-[130%] text-muted">Predicted</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-2 w-4 rounded-full bg-[#47802B]" />
-            <span className="text-[10px] font-medium text-[#222222]/60">Actual</span>
+            <span className="h-2 w-4 rounded-full bg-greenNormal" />
+            <span className="font-montserrat text-[10px] font-medium leading-[130%] text-muted">Actual</span>
           </div>
         </div>
       </div>
 
-      <div className="relative flex-1 h-[260px] mt-4">
+      <div className="relative flex-1 min-h-0 mt-2">
         {/* Y-Axis Labels */}
-        <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-right text-[10px] text-black/40 w-8 pr-2">
+        <div className="absolute bottom-6 left-0 top-0 flex w-8 flex-col justify-between pr-2 text-right font-montserrat text-[10px] font-medium leading-[130%] text-muted">
           {yAxisLabels.map((label) => (
             <span key={label}>{label}</span>
           ))}
@@ -175,7 +180,7 @@ function ForecastChart() {
 
           {/* SVG Chart */}
           <svg
-            className="absolute inset-0 h-full w-full overflow-visible"
+            className="absolute inset-0 h-full w-full"
             viewBox="0 0 717 267"
             preserveAspectRatio="none"
           >
@@ -202,14 +207,17 @@ function ForecastChart() {
         </div>
 
         {/* X-Axis Labels */}
-        <div className="absolute left-8 right-0 bottom-0 flex justify-between text-[10px] text-black/40">
+        <div className="absolute bottom-0 left-8 right-0 flex justify-between font-montserrat text-[10px] font-medium leading-[130%] text-muted">
           {monthLabels.map((label, index) => (
             <span key={`${label}-${index}`}>{label}</span>
           ))}
         </div>
       </div>
 
-      <div className="absolute left-2 top-1/2 -translate-y-1/2 -rotate-90 text-[10px] font-medium text-black/30">
+      <div 
+        className="absolute flex h-[13px] w-[32px] items-center justify-center whitespace-nowrap font-montserrat text-[10px] font-medium leading-[130%] text-muted"
+        style={{ left: '4px', top: 'calc(50% - 13px/2 - 9.5px)', transform: 'rotate(-90deg)' }}
+      >
         In Ton
       </div>
     </div>
@@ -218,15 +226,15 @@ function ForecastChart() {
 
 function WeatherCard() {
   return (
-    <div className="relative h-full min-h-[355px] w-full rounded-[20px] bg-[#EDF2EA]">
+    <div className="relative h-[308px] w-full rounded-[20px] bg-greenLight">
       {/* Weather alerts title */}
-      <div className="absolute left-[16px] top-[12px] w-[105px] h-[18px] font-montserrat text-[14px] font-medium leading-[1.3] text-black">
+      <div className="absolute left-[16px] top-[12px] h-[18px] w-[105px] font-montserrat text-[14px] font-medium leading-[130%] text-ink">
         Weather alerts
       </div>
 
       {/* Frame 1948761662 (Top Alert Box) */}
       <div className="absolute left-[16px] top-[40px] flex h-[24px] w-[calc(100%-32px)] items-center rounded-[7px] bg-white px-[10px] gap-[10px]">
-        <span className="font-montserrat text-[12px] font-medium leading-[1.3] text-[#554D2C] w-full h-[16px] truncate">
+        <span className="h-[16px] w-full truncate font-montserrat text-[12px] font-medium leading-[130%] text-yellowDarker">
           High temperature conditions expected. Crop stress likely.
         </span>
       </div>
@@ -236,15 +244,15 @@ function WeatherCard() {
         {/* Frame 1948761653 (Left part) */}
         <div className="flex h-[52px] w-[151px] items-center gap-[9px]">
           {/* Temperature text */}
-          <div className="font-montserrat text-[40px] font-medium leading-[1.3] text-black w-[66px] h-[52px] flex items-center">
+          <div className="flex h-[52px] w-[66px] items-center font-montserrat text-[40px] font-medium leading-[130%] text-ink">
             38°
           </div>
           {/* Frame 1948761652 (Friday & time) */}
           <div className="flex h-[49px] w-[76px] flex-col justify-center">
-            <span className="font-montserrat text-[24px] font-medium leading-[1.3] text-black w-[76px] h-[31px]">
+            <span className="h-[31px] w-[76px] font-montserrat text-[24px] font-medium leading-[130%] text-ink">
               Friday
             </span>
-            <span className="font-montserrat text-[14px] font-medium leading-[1.3] text-black w-[65px] h-[18px]">
+            <span className="h-[18px] w-[65px] font-montserrat text-[14px] font-medium leading-[130%] text-ink">
               03:45 PM
             </span>
           </div>
@@ -262,8 +270,8 @@ function WeatherCard() {
       </div>
 
       {/* Frame 1948761661 (Bottom Alert Box) */}
-      <div className="absolute left-[16px] top-[147px] flex h-[24px] w-[calc(100%-32px)] max-w-[404px] items-center rounded-[7px] bg-[#C6D8BD] px-[10px] gap-[10px]">
-        <span className="font-montserrat text-[12px] font-medium leading-[1.3] text-[#192D0F] w-full h-[16px] truncate">
+      <div className="absolute left-[16px] top-[147px] flex h-[24px] w-[calc(100%-32px)] max-w-[404px] items-center gap-[10px] rounded-[7px] bg-greenLightActive px-[10px]">
+        <span className="h-[16px] w-full truncate font-montserrat text-[12px] font-medium leading-[130%] text-greenDarker">
           Irrigate during early morning or evening hours.
         </span>
       </div>
@@ -271,14 +279,9 @@ function WeatherCard() {
       {/* Frame 1948760941 (Open GIS view button) */}
       <Link
         href="/land-intelligence"
-        className="absolute bottom-[16px] left-[16px] flex h-[28px] w-[calc(100%-32px)] items-center justify-center gap-[10px] rounded-[15px] bg-[#396622] font-montserrat text-[12px] font-medium leading-[1.3] text-white"
+        className="absolute bottom-[16px] left-[16px] flex h-[28px] w-[calc(100%-32px)] items-center justify-center gap-[10px] rounded-[15px] bg-greenNormalActive font-montserrat text-[12px] font-medium leading-[130%] text-white transition-colors hover:bg-greenDark"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-          <rect x="1.66" y="1.66" width="12.67" height="12.67" rx="2" stroke="white" strokeWidth="1"/>
-          <path d="M1.66 3H14.33" stroke="white" strokeWidth="1" />
-          <path d="M8.33 4.33V14.33" stroke="white" strokeWidth="1" />
-          <path d="M1.66 8H10" stroke="white" strokeWidth="1" />
-        </svg>
+        <LandIntelligenceIcon className="h-4 w-4 shrink-0 text-white" />
         <span className="w-[89px] h-[16px] flex items-center justify-center">Open GIS view</span>
       </Link>
     </div>
@@ -287,39 +290,41 @@ function WeatherCard() {
 
 export function HomeHero() {
   return (
-    <section className="h-full overflow-hidden bg-canvas p-6 lg:px-6 lg:py-8">
-      <div className="flex h-full w-full flex-col gap-10 overflow-hidden">
+    <section className="bg-canvas px-5 py-6 lg:px-5 lg:py-7">
+      <div className="flex w-full flex-col gap-7">
         {/* Greeting Section */}
         <div>
-          <div className="font-montserrat flex items-center gap-3 text-[32px] leading-tight text-[#222222]">
+          <div className="flex items-center gap-3 font-montserrat text-[32px] leading-tight text-ink">
             <p className="font-medium opacity-50">Good morning</p>
             <p className="font-bold italic">Deovrat</p>
           </div>
           <div className="mt-2 flex items-center gap-[10px]">
             <GreetingPinIcon />
-            <p className="font-poppins text-[14px] leading-none text-black opacity-50">
+            <p className="font-montserrat text-[14px] font-medium leading-[130%] text-muted">
               Kendri, Dhamtari Rd, Raipur, CG
             </p>
           </div>
         </div>
 
-        {/* First Row: Crop Catalogue & Map */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-          <div className="xl:col-span-7">
-            <CropCatalogueCard />
+        <div className="flex flex-col gap-5">
+          {/* First Row: Crop Catalogue & Map */}
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12">
+            <div className="min-w-0 xl:col-span-7">
+              <CropCatalogueCard />
+            </div>
+            <div className="min-w-0 xl:col-span-5">
+              <MapCard />
+            </div>
           </div>
-          <div className="xl:col-span-5">
-            <MapCard />
-          </div>
-        </div>
 
-        {/* Second Row: Forecast & Weather */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
-          <div className="xl:col-span-8">
-            <ForecastChart />
-          </div>
-          <div className="xl:col-span-4">
-            <WeatherCard />
+          {/* Second Row: Forecast & Weather */}
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12">
+            <div className="min-w-0 xl:col-span-8">
+              <ForecastChart />
+            </div>
+            <div className="min-w-0 xl:col-span-4">
+              <WeatherCard />
+            </div>
           </div>
         </div>
       </div>

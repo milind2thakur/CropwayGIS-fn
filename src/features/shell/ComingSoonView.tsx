@@ -16,13 +16,13 @@ export function ComingSoonView({
     <section className="rounded-[28px] border border-line bg-panel p-6 shadow-panel lg:p-8">
       <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-moss">{eyebrow}</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-[#23311f] lg:text-5xl">{title}</h1>
-          <p className="mt-4 max-w-xl text-sm leading-7 text-muted lg:text-base">{body}</p>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-greenDark">{eyebrow}</p>
+          <h1 className="font-montserrat text-[32px] font-medium leading-[130%] tracking-tight text-ink lg:text-[48px]">{title}</h1>
+          <p className="mt-4 max-w-xl font-montserrat text-[16px] font-medium leading-[130%] text-muted">{body}</p>
         </div>
         <Link
           href="/crop-planning"
-          className="inline-flex items-center gap-2 rounded-xl bg-moss px-4 py-3 text-sm font-medium text-white transition hover:bg-[#294f1f]"
+          className="inline-flex h-[43px] items-center justify-center gap-[10px] rounded-[9px] border border-transparent bg-greenDark px-5 py-[10px] font-montserrat text-[18px] font-medium leading-[130%] text-white transition-colors hover:bg-greenDarkHover"
         >
           Open Crop Planning
           <ArrowRight className="h-4 w-4" />
@@ -32,7 +32,7 @@ export function ComingSoonView({
       <div className="grid gap-4 md:grid-cols-4">
         {dashboardStats.map((item) => (
           <div key={item.label} className="rounded-2xl border border-line bg-white px-4 py-5">
-            <div className="text-2xl font-semibold text-[#21311f]">{item.value}</div>
+            <div className="font-montserrat text-[24px] font-medium leading-[130%] text-ink">{item.value}</div>
             <div className="mt-2 text-xs uppercase tracking-[0.18em] text-muted">{item.label}</div>
           </div>
         ))}
@@ -40,13 +40,12 @@ export function ComingSoonView({
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         {topSignalCards.map((card) => (
-          <div key={card.title} className="rounded-2xl border border-line bg-[#fbfcfa] p-5">
-            <h2 className="text-lg font-semibold text-[#243620]">{card.title}</h2>
-            <p className="mt-3 text-sm leading-7 text-muted">{card.body}</p>
+          <div key={card.title} className="rounded-2xl border border-line bg-panel p-5">
+            <h2 className="font-montserrat text-[18px] font-medium leading-[130%] text-ink">{card.title}</h2>
+            <p className="mt-3 font-montserrat text-[14px] font-medium leading-[130%] text-muted">{card.body}</p>
           </div>
         ))}
       </div>
     </section>
   );
 }
-

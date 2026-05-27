@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/api/client';
+import { apiFetch } from './client';
 import {
   ApiEnvelope,
   CalculationRequest,
@@ -8,27 +8,25 @@ import {
   UnitOption,
 } from '@/features/crop-planning/types';
 
-export function getSeasons() {
-  return apiFetch<ApiEnvelope<Array<{ id: Season; label: string }>>>('/api/v1/reference/seasons/');
+export async function getSeasons(): Promise<ApiEnvelope<Array<{ id: Season; label: string }>>> {
+  return apiFetch('/api/v1/reference/seasons/');
 }
 
-export function getUnits() {
-  return apiFetch<ApiEnvelope<UnitOption[]>>('/api/v1/reference/units/');
+export async function getUnits(): Promise<ApiEnvelope<UnitOption[]>> {
+  return apiFetch('/api/v1/reference/units/');
 }
 
-export function getCrops(season: Season, query: string) {
-  const params = new URLSearchParams();
-  params.set('season', season);
-  if (query.trim()) {
-    params.set('q', query.trim());
+export async function getCrops(season: Season, query: string): Promise<ApiEnvelope<CropOption[]>> {
+  const params = new URLSearchParams({ season });
+  if (query) {
+    params.append('q', query);
   }
-  return apiFetch<ApiEnvelope<CropOption[]>>(`/api/v1/reference/crops/?${params.toString()}`);
+  return apiFetch(`/api/v1/reference/crops/?${params.toString()}`);
 }
 
-export function calculateCropPlan(payload: CalculationRequest) {
-  return apiFetch<ApiEnvelope<CalculationResponse>>('/api/v1/crop-planning/calculate/', {
+export async function calculateCropPlan(payload: CalculationRequest): Promise<ApiEnvelope<CalculationResponse>> {
+  return apiFetch('/api/v1/crop-planning/calculate/', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
-
