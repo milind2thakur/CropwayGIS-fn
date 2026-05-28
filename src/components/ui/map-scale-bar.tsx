@@ -59,9 +59,11 @@ function measureScaleMeters(map: LeafletLikeMap) {
 export function MapScaleBar({
   map,
   color = 'black',
+  className = 'bottom-6 left-6',
 }: {
   map: LeafletLikeMap | null;
   color?: 'black' | 'white';
+  className?: string;
 }) {
   const [totalMeters, setTotalMeters] = useState(1500);
 
@@ -96,7 +98,7 @@ export function MapScaleBar({
 
   return (
     <div
-      className="pointer-events-none absolute bottom-6 left-6 z-[1000] h-[56px] w-[268px]"
+      className={`pointer-events-none absolute z-[1000] h-[56px] w-[268px] ${className}`}
       style={{ color }}
     >
       <div className="font-montserrat text-[10px] font-medium leading-[130%]">

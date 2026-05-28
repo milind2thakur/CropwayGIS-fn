@@ -17,7 +17,7 @@ export default async function CropPlanningPage(props: Props) {
       {isPortfolioStep ? (
         <CropPortfolioClient />
       ) : isSelectionStep ? (
-        <LandIntelligenceClient />
+        <LandIntelligenceClient mode="crop-planning-selection" />
       ) : (
         <CropPlanningClient />
       )}

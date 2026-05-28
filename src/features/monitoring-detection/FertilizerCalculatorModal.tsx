@@ -8,11 +8,11 @@ interface FertilizerCalculatorModalProps {
 
 function StepperField({ value }: { value: string }) {
   return (
-    <div className="flex h-[60px] items-center justify-between rounded-[14px] bg-[#F4F7FA] px-[24px]">
-      <span className="font-montserrat text-[24px] font-medium leading-[130%] text-[#1E1E1E]">{value}</span>
-      <span className="flex flex-col">
-        <ChevronUp className="h-[22px] w-[22px] text-[#203A13]" strokeWidth={2} />
-        <ChevronDown className="h-[22px] w-[22px] text-[#203A13]" strokeWidth={2} />
+    <div className="flex h-[30px] items-center justify-between rounded-[8px] bg-[#F4F7FA] px-[12px]">
+      <span className="font-poppins text-[12px] text-[#1E1E1E]">{value}</span>
+      <span className="flex flex-col gap-[2px]">
+        <ChevronUp className="h-[10px] w-[10px] text-[#203A13]" strokeWidth={3} />
+        <ChevronDown className="h-[10px] w-[10px] text-[#203A13]" strokeWidth={3} />
       </span>
     </div>
   );
@@ -25,62 +25,62 @@ export function FertilizerCalculatorModal({ isOpen, onClose }: FertilizerCalcula
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 p-4">
-      <div className="relative h-[min(980px,calc(100vh-32px))] w-[min(1118px,calc(100vw-32px))] overflow-auto rounded-[32px] bg-white font-montserrat">
+      <div className="relative h-[491px] w-[559px] overflow-hidden rounded-[20px] bg-white font-montserrat">
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-[34px] top-[34px] text-[#203A13] transition-opacity hover:opacity-70"
+          className="absolute right-[9.47px] top-[14px] text-[#203A13] transition-opacity hover:opacity-70"
           aria-label="Close fertilizer calculator"
         >
-          <X className="h-[36px] w-[36px]" strokeWidth={1.8} />
+          <X className="h-[24px] w-[24px]" strokeWidth={1.8} />
         </button>
 
-        <div className="px-[38px] pt-[28px]">
-          <h2 className="text-[38px] font-medium leading-[130%] text-black">Fertilizer Calculator</h2>
+        <div className="px-[19px] pt-[14px]">
+          <h2 className="text-[18px] font-medium leading-[130%] text-black">Fertilizer Calculator</h2>
 
-          <div className="mt-[32px] flex items-end gap-[60px]">
-            <div className="w-[388px]">
-              <label className="mb-[10px] block text-[20px] font-medium leading-[130%] text-black/50">Growth Stage</label>
-              <button className="flex h-[52px] w-full items-center justify-between rounded-[10px] bg-[#C6D8BD] px-[20px] text-[#203A13]">
-                <span className="text-[24px] font-medium leading-[130%]">Sowing</span>
-                <ChevronDown className="h-[28px] w-[28px]" strokeWidth={2} />
+          <div className="mt-[22px] flex items-end gap-[30px]">
+            <div className="w-[194px]">
+              <label className="mb-[5px] block text-[10px] font-medium leading-[130%] text-black/50">Growth Stage</label>
+              <button className="flex h-[26px] w-full items-center justify-between rounded-[6px] bg-[#C6D8BD] px-[10px] text-[#203A13]">
+                <span className="text-[12px] font-medium leading-[130%]">Sowing</span>
+                <ChevronDown className="h-[14px] w-[14px]" strokeWidth={2} />
               </button>
             </div>
 
-            <div className="flex h-[72px] items-center rounded-[18px] bg-[#EDF2EA] p-[6px] pr-[18px]">
-              <div className="grid h-[60px] w-[77px] place-items-center rounded-[14px] bg-[#F4F7FA]">
-                <span className="text-[24px] font-medium leading-[130%] text-[#1E1E1E]">1.0</span>
+            <div className="flex h-[36px] w-[107px] items-center rounded-[10px] bg-[#EDF2EA] p-[3px] pr-[10px]">
+              <div className="flex h-[30px] w-[38px] items-center justify-center rounded-[8px] bg-[#F4F7FA]">
+                <span className="font-poppins text-[12px] text-[#1E1E1E]">1.0</span>
               </div>
-              <span className="ml-[20px] text-[26px] font-medium leading-[130%] text-black">Acre</span>
-              <ChevronDown className="ml-[16px] h-[28px] w-[28px] text-[#203A13]" strokeWidth={2} />
+              <span className="ml-[8px] text-[12px] font-medium leading-[130%] text-black">Acre</span>
+              <ChevronDown className="ml-auto h-[14px] w-[14px] text-black" strokeWidth={2} />
             </div>
           </div>
 
-          <h3 className="mt-[64px] text-[28px] font-medium leading-[130%] text-black">Nutrients Recommended</h3>
+          <h3 className="mt-[32px] text-[12px] font-medium leading-[130%] text-black">Nutrients Recommended</h3>
 
-          <div className="mt-[6px] rounded-[18px] border border-[#DADADA] px-[32px] py-[28px]">
-            <div className="grid grid-cols-3 gap-[60px]">
-              <div>
-                <div className="mb-[8px] text-[26px] font-medium leading-[130%] text-black">Nitrogen N</div>
+          <div className="mt-[3px] flex h-[79px] w-[522px] items-center rounded-[9px] border border-[#DADADA] px-[17px]">
+            <div className="flex w-full justify-between">
+              <div className="w-[141px]">
+                <div className="mb-[3px] text-[12px] font-medium leading-[130%] text-black">Nitrogen N</div>
                 <StepperField value="100 KG" />
               </div>
-              <div>
-                <div className="mb-[8px] text-[26px] font-medium leading-[130%] text-black">Phosphorus P₂O₅</div>
+              <div className="w-[141px]">
+                <div className="mb-[3px] text-[12px] font-medium leading-[130%] text-black">Phosphorus P₂O₅</div>
                 <StepperField value="50 KG" />
               </div>
-              <div>
-                <div className="mb-[8px] text-[26px] font-medium leading-[130%] text-black">Potassium K₂O</div>
+              <div className="w-[141px]">
+                <div className="mb-[3px] text-[12px] font-medium leading-[130%] text-black">Potassium K₂O</div>
                 <StepperField value="50 KG" />
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mt-[32px] border-t border-black/20 px-[38px] pt-[30px]">
-          <h3 className="text-[28px] font-medium leading-[130%] text-black">Fertilizers Required</h3>
+        <div className="mt-[32px] px-[19px]">
+          <h3 className="text-[12px] font-medium leading-[130%] text-black">Fertilizers Required</h3>
 
-          <div className="mx-auto mt-[34px] w-[88%]">
-            <div className="grid grid-cols-[1fr_180px_1.9fr] border-b border-black/20 pb-[10px] text-[20px] font-medium leading-[130%] text-black/50">
+          <div className="mt-[20px] w-[522px]">
+            <div className="grid grid-cols-[119px_90px_1fr] border-b border-black/20 pb-[6px] pl-[21px] text-[10px] font-medium leading-[130%] text-black/50">
               <span>Fertilizers</span>
               <span>Quantity</span>
               <span>Nutrients contents</span>
@@ -90,31 +90,38 @@ export function FertilizerCalculatorModal({ isOpen, onClose }: FertilizerCalcula
               ['Urea', '217 KG', 'Contains 46% Nitrogen'],
               ['DAP', '109 KG', 'Contains 18% Nitrogen + 46 % Phosphorus'],
               ['MOP', '83 KG', 'Contains 60% Potassium'],
-            ].map(([name, quantity, content]) => (
-              <div key={name} className="grid grid-cols-[1fr_180px_1.9fr] border-b border-black/20 py-[18px] text-[24px] font-medium leading-[130%] text-[#1E1E1E]">
-                <span>{name}</span>
-                <span>{quantity}</span>
-                <span className="text-[22px]">{content}</span>
+            ].map(([name, quantity, content], i, arr) => (
+              <div
+                key={name}
+                className={`grid h-[38px] grid-cols-[119px_90px_1fr] items-center pl-[21px] text-[12px] leading-[130%] ${
+                  i !== arr.length - 1 ? 'border-b border-black/20' : ''
+                }`}
+              >
+                <span className="font-medium text-black">{name}</span>
+                <span className="font-poppins text-[#1E1E1E]">{quantity}</span>
+                <span className="text-[10px] font-medium text-[#1E1E1E]">{content}</span>
               </div>
             ))}
+            <div className="border-t border-black/20" />
           </div>
 
-          <div className="mt-[42px] flex justify-end gap-[16px]">
+          <div className="absolute bottom-[15px] right-[20px] flex items-center gap-[8px]">
             <button
               type="button"
-              className="flex h-[52px] w-[220px] items-center justify-center rounded-[10px] bg-[#E3ECDF] text-[26px] font-medium leading-[130%] text-[#203A13] transition-opacity hover:opacity-80"
+              className="flex h-[26px] w-[110px] items-center justify-center rounded-[6px] bg-[#E3ECDF] text-[12px] font-medium leading-[130%] text-[#203A13] transition-opacity hover:opacity-80"
             >
               Clear
             </button>
-            <Link
-              href="/crop-planning"
-              className="flex h-[52px] w-[294px] items-center justify-center rounded-[10px] bg-[#356020] text-[26px] font-medium leading-[130%] text-white transition-opacity hover:opacity-80"
+            <button
+              type="button"
+              className="flex h-[26px] w-[147px] items-center justify-center rounded-[6px] bg-[#356020] text-[12px] font-medium leading-[130%] text-white transition-opacity hover:opacity-80"
             >
               Shop Fertilizers
-            </Link>
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
 }
+

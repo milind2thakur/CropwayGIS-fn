@@ -2,13 +2,14 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Map, Menu, ShoppingBasket, Users, X } from 'lucide-react';
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 
 import { CropwayGisLogo } from '@/components/CropwayGisLogo';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 import { gisNavItems } from './config';
 
@@ -51,6 +52,9 @@ function ProfileDropdown() {
   const [dropPos, setDropPos] = useState({ top: 0, right: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  
+  const { user, isAuthenticated, logout } = useAuth();
+  const router = useRouter();
 
   function handleToggle() {
     if (!open && btnRef.current) {
@@ -101,15 +105,22 @@ function ProfileDropdown() {
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-greenDarkHover/15">
               <UserCircleDuotone />
             </div>
-            <div className="flex flex-col">
-              <span className="font-montserrat text-[13px] font-semibold leading-tight text-ink">My Account</span>
-              <span className="font-montserrat text-[11px] leading-tight text-muted">CropwayGIS User</span>
+            <div className="flex flex-col gap-0.5">
+              <span className="font-montserrat text-[13px] font-semibold leading-normal text-ink">
+                {user?.username || 'My Account'}
+              </span>
+              <span className="font-montserrat text-[11px] leading-normal text-muted">
+                {user?.phone_number || 'CropwayGIS User'}
+              </span>
             </div>
           </div>
 
           <div className="flex flex-col py-1.5">
             {/* 1. Profile */}
-            <button className="flex w-full items-center gap-3 px-4 py-2.5 text-left font-montserrat text-[13px] text-ink transition-colors hover:bg-greenLight">
+            <button 
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left font-montserrat text-[13px] text-ink transition-colors hover:bg-greenLight"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-greenDarkHover">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                 <circle cx="12" cy="7" r="4"/>
@@ -118,7 +129,10 @@ function ProfileDropdown() {
             </button>
 
             {/* 2. Settings */}
-            <button className="flex w-full items-center gap-3 px-4 py-2.5 text-left font-montserrat text-[13px] text-ink transition-colors hover:bg-greenLight">
+            <button 
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left font-montserrat text-[13px] text-ink transition-colors hover:bg-greenLight"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-greenDarkHover">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -129,13 +143,22 @@ function ProfileDropdown() {
             <div className="mx-3 my-1 h-px bg-black/10" />
 
             {/* 3. Login / Logout */}
-            <button className="flex w-full items-center gap-3 px-4 py-2.5 text-left font-montserrat text-[13px] font-medium text-red-600 transition-colors hover:bg-red-50">
+            <button 
+              onClick={() => {
+                setOpen(false);
+                if (isAuthenticated) {
+                  logout();
+                }
+                router.push('/login');
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left font-montserrat text-[13px] font-medium text-red-600 transition-colors hover:bg-red-50"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
                 <polyline points="16 17 21 12 16 7"/>
                 <line x1="21" y1="12" x2="9" y2="12"/>
               </svg>
-              Login / Logout
+              {isAuthenticated ? 'Logout' : 'Login'}
             </button>
           </div>
         </div>

@@ -3,21 +3,40 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
-  Minus,
-  Plus,
   ChevronDown,
   Calendar,
   Phone,
+  Crosshair,
+  Ruler,
   Search,
+  Trash2,
 } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MapToolPillBar, MapZoomControls } from '@/components/ui/map-controls';
 import { MapScaleBar } from '@/components/ui/map-scale-bar';
-import { searchLocations, type GeocodingResult } from '@/lib/api/land-intelligence';
+import {
+  getDistrictBoundaries,
+  getLandCover,
+  getSavedGisAreas,
+  getSoilInfo,
+  getSoilPolygon,
+  saveGisArea,
+  searchLocations,
+  type GeocodingResult,
+  type GeoJsonFeature,
+  type GeoJsonFeatureCollection,
+  type JsonObject,
+  type JsonValue,
+  type LandCoverFeatureCollection,
+  type LandCoverType,
+  type SavedGisArea,
+  type SoilPolygonProperties,
+} from '@/lib/api/land-intelligence';
 import { cn } from '@/lib/utils';
 
 declare global {
@@ -35,6 +54,11 @@ type PolygonSelection = {
   id: string;
   coords: Coord[];
 };
+
+type SoilQueryTarget =
+  | { type: 'polygon'; centroid: Coord; radiusKm: number; polygonId: string }
+  | { type: 'pin'; coord: Coord; radiusKm: number }
+  | { type: 'map-center'; coord: Coord; radiusKm: number };
 
 type MapTypeId = 'roadmap' | 'satellite';
 
@@ -80,7 +104,190 @@ function flattenPolygonCoords(polygons: PolygonSelection[]) {
   return polygons.flatMap((p) => p.coords);
 }
 
-type MapTool = 'draw' | 'pin' | 'cursor';
+function polygonToFeatureCollection(polygons: PolygonSelection[]): GeoJsonFeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: polygons
+      .filter((polygon) => polygon.coords.length >= 3)
+      .map((polygon) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            ...polygon.coords.map((coord) => [coord.lng, coord.lat]),
+            [polygon.coords[0].lng, polygon.coords[0].lat],
+          ]],
+        },
+        properties: { id: polygon.id },
+      })),
+  };
+}
+
+function getSelectionCentroid(polygons: PolygonSelection[]): Coord {
+  const coords = flattenPolygonCoords(polygons);
+  if (coords.length === 0) {
+    return DEFAULT_CENTER;
+  }
+
+  return {
+    lat: coords.reduce((sum, coord) => sum + coord.lat, 0) / coords.length,
+    lng: coords.reduce((sum, coord) => sum + coord.lng, 0) / coords.length,
+  };
+}
+
+function getPolygonCentroid(coords: Coord[]): Coord {
+  if (coords.length === 0) {
+    return DEFAULT_CENTER;
+  }
+
+  return {
+    lat: coords.reduce((sum, coord) => sum + coord.lat, 0) / coords.length,
+    lng: coords.reduce((sum, coord) => sum + coord.lng, 0) / coords.length,
+  };
+}
+
+function getSoilRadiusKm(coords: Coord[]) {
+  const areaSqm = computePolygonAreaSqm(coords);
+  if (areaSqm <= 0) {
+    return 2;
+  }
+  return Math.max(0.5, Math.min(10, Math.sqrt(areaSqm / Math.PI) / 1000));
+}
+
+function getSoilTargetCoord(target: SoilQueryTarget) {
+  return target.type === 'polygon' ? target.centroid : target.coord;
+}
+
+function getDistanceMeters(from: Coord, to: Coord) {
+  const earthRadiusMeters = 6371000;
+  const fromLat = from.lat * Math.PI / 180;
+  const toLat = to.lat * Math.PI / 180;
+  const deltaLat = (to.lat - from.lat) * Math.PI / 180;
+  const deltaLng = (to.lng - from.lng) * Math.PI / 180;
+  const a = Math.sin(deltaLat / 2) ** 2
+    + Math.cos(fromLat) * Math.cos(toLat) * Math.sin(deltaLng / 2) ** 2;
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatDistance(meters: number) {
+  if (meters >= 1000) {
+    return `${(meters / 1000).toFixed(2)} km`;
+  }
+  return `${Math.round(meters)} m`;
+}
+
+const LAND_COVER_OPTIONS: Array<{ value: LandCoverType; label: string; color: string }> = [
+  { value: 'forrest_land', label: 'Forest', color: '#2f6b3f' },
+  { value: 'built_up_land', label: 'Built-up', color: '#b85b55' },
+  { value: 'grass_scrub_woodland', label: 'Grass/Scrub', color: '#a4b65c' },
+  { value: 'irrigated_cultivated_land', label: 'Irrigated', color: '#5d9b73' },
+  { value: 'rain_fed_cultivated_land', label: 'Rain-fed', color: '#d2b45f' },
+  { value: 'very_sparsely_vegetated_land', label: 'Sparse', color: '#c8b79b' },
+];
+
+function getLandCoverColor(type: LandCoverType) {
+  return LAND_COVER_OPTIONS.find((option) => option.value === type)?.color ?? '#5d9b73';
+}
+
+function getTargetLabel(target: SoilQueryTarget | null) {
+  if (!target) {
+    return {
+      title: 'Map center',
+      detail: 'No active target selected',
+      radius: '2.0 km',
+      coord: null as Coord | null,
+    };
+  }
+
+  if (target.type === 'polygon') {
+    return {
+      title: `Polygon ${target.polygonId}`,
+      detail: 'Drawn area target',
+      radius: `${target.radiusKm.toFixed(1)} km`,
+      coord: target.centroid,
+    };
+  }
+
+  if (target.type === 'pin') {
+    return {
+      title: 'Pinned point',
+      detail: 'Point target',
+      radius: `${target.radiusKm.toFixed(1)} km`,
+      coord: target.coord,
+    };
+  }
+
+  return {
+    title: 'Map center',
+    detail: 'Fallback target',
+    radius: `${target.radiusKm.toFixed(1)} km`,
+    coord: target.coord,
+  };
+}
+
+function savedAreaToFeature(area: SavedGisArea): GeoJsonFeature | null {
+  const geoData = area.location_geo_data;
+  if (!geoData || typeof geoData !== 'object' || Array.isArray(geoData)) {
+    return null;
+  }
+
+  if (geoData.type === 'Feature') {
+    return geoData as GeoJsonFeature;
+  }
+
+  if (geoData.type === 'FeatureCollection') {
+    const featureCollection = geoData as GeoJsonFeatureCollection;
+    return featureCollection.features[0] ?? null;
+  }
+
+  if (typeof geoData.type === 'string' && 'coordinates' in geoData) {
+    return {
+      type: 'Feature',
+      geometry: geoData as GeoJsonFeature['geometry'],
+      properties: { id: area.id, label: area.label },
+    };
+  }
+
+  return null;
+}
+
+function findFirstSoilGlobalId(collection: GeoJsonFeatureCollection<SoilPolygonProperties>) {
+  for (const feature of collection.features) {
+    const properties = feature.properties;
+    const value = properties.MU_GLOBAL ?? properties.snum;
+    if (value !== undefined && value !== null) {
+      return String(value);
+    }
+  }
+  return null;
+}
+
+function formatSoilInfoValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return 'Available';
+}
+
+function getSoilInfoRecord(soilInfo: unknown): JsonObject | null {
+  if (Array.isArray(soilInfo)) {
+    const firstRecord = soilInfo.find((item): item is JsonObject => Boolean(item) && typeof item === 'object' && !Array.isArray(item));
+    return firstRecord ?? null;
+  }
+  if (soilInfo && typeof soilInfo === 'object' && !Array.isArray(soilInfo)) {
+    return soilInfo as JsonObject;
+  }
+  return null;
+}
+
+function getRecordValue(record: JsonObject | null, key: string): JsonValue | undefined {
+  return record?.[key];
+}
+
+type MapTool = 'draw' | 'pin' | 'cursor' | 'probe' | 'measure' | 'clear';
 
 function DrawAreaIcon({ className }: { className?: string }) {
   return (
@@ -118,6 +325,18 @@ function CursorSelectIcon({ className }: { className?: string }) {
   );
 }
 
+function SoilProbeIcon({ className }: { className?: string }) {
+  return <Crosshair className={className} strokeWidth={1.8} />;
+}
+
+function MeasureIcon({ className }: { className?: string }) {
+  return <Ruler className={className} strokeWidth={1.8} />;
+}
+
+function ClearIcon({ className }: { className?: string }) {
+  return <Trash2 className={className} strokeWidth={1.8} />;
+}
+
 function MapToolbar({
   activeTool,
   onToolChange,
@@ -129,35 +348,217 @@ function MapToolbar({
     { id: 'draw', label: 'Draw area', icon: DrawAreaIcon },
     { id: 'pin', label: 'Pin location', icon: PinLocationIcon },
     { id: 'cursor', label: 'Select', icon: CursorSelectIcon },
+    { id: 'probe', label: 'Soil probe', icon: SoilProbeIcon },
+    { id: 'measure', label: 'Measure', icon: MeasureIcon },
+    { id: 'clear', label: 'Clear', icon: ClearIcon },
   ];
 
   return (
-    <div
-      className="absolute bottom-5 left-1/2 z-[1000] -translate-x-1/2 flex items-center justify-center gap-[18px] bg-white px-5 shadow-lg"
-      style={{
-        height: 52,
-        borderRadius: 26,
-      }}
-    >
-      {tools.map(({ id, label, icon: Icon }) => {
-        const isActive = activeTool === id;
-        return (
+    <MapToolPillBar tools={tools} activeTool={activeTool} onToolChange={onToolChange} />
+  );
+}
+
+function GisLayerControls({
+  showDistricts,
+  showSoil,
+  showSavedAreas,
+  showLandCover,
+  landCoverType,
+  onToggleDistricts,
+  onToggleSoil,
+  onToggleSavedAreas,
+  onToggleLandCover,
+  onLandCoverTypeChange,
+  onFetchSoil,
+  onFetchLandCover,
+  soilLoading,
+  landCoverLoading,
+}: {
+  showDistricts: boolean;
+  showSoil: boolean;
+  showSavedAreas: boolean;
+  showLandCover: boolean;
+  landCoverType: LandCoverType;
+  onToggleDistricts: () => void;
+  onToggleSoil: () => void;
+  onToggleSavedAreas: () => void;
+  onToggleLandCover: () => void;
+  onLandCoverTypeChange: (type: LandCoverType) => void;
+  onFetchSoil: () => void;
+  onFetchLandCover: () => void;
+  soilLoading: boolean;
+  landCoverLoading: boolean;
+}) {
+  const items = [
+    { label: 'District Boundary', active: showDistricts, onClick: onToggleDistricts },
+    { label: 'Soil Layer', active: showSoil, onClick: onToggleSoil },
+    { label: 'Land Cover', active: showLandCover, onClick: onToggleLandCover },
+    { label: 'Saved Areas', active: showSavedAreas, onClick: onToggleSavedAreas },
+  ];
+
+  return (
+    <div className="absolute left-6 top-[84px] z-[1000] flex w-[240px] flex-col gap-2 rounded-[14px] border border-white bg-white/85 p-2 shadow-sm backdrop-blur-[12px]">
+      {items.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          onClick={item.onClick}
+          className={cn(
+            'flex h-[28px] items-center justify-between rounded-[8px] px-3 font-montserrat text-[11px] font-semibold transition',
+            item.active ? 'bg-greenDark text-white' : 'bg-white/80 text-ink hover:bg-greenLight'
+          )}
+        >
+          <span>{item.label}</span>
+          <span>{item.active ? 'On' : 'Off'}</span>
+        </button>
+      ))}
+      <button
+        type="button"
+        onClick={onFetchSoil}
+        disabled={soilLoading}
+        className="h-[30px] rounded-[8px] bg-yellowNormal px-3 font-montserrat text-[11px] font-semibold text-ink transition hover:bg-yellowNormal/80 disabled:opacity-60"
+      >
+        {soilLoading ? 'Fetching soil...' : 'Fetch soil intelligence'}
+      </button>
+      <div className="grid grid-cols-2 gap-1">
+        {LAND_COVER_OPTIONS.slice(0, 6).map((option) => (
           <button
-            key={id}
+            key={option.value}
             type="button"
-            onClick={() => onToolChange(id)}
-            aria-label={label}
+            onClick={() => onLandCoverTypeChange(option.value)}
             className={cn(
-              'flex items-center justify-center transition-all duration-200',
-              isActive
-                ? 'bg-greenDark text-white w-[30px] h-[40px] rounded-[15px]'
-                : 'h-[30px] w-[30px] rounded-[8px] text-ink hover:bg-greenLight'
+              'h-[24px] rounded-[7px] px-2 font-montserrat text-[10px] font-semibold transition',
+              landCoverType === option.value ? 'bg-greenDark text-white' : 'bg-white/80 text-ink hover:bg-greenLight'
             )}
           >
-            <Icon className="w-[18px] h-[18px]" />
+            {option.label}
           </button>
-        );
-      })}
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={onFetchLandCover}
+        disabled={landCoverLoading}
+        className="h-[30px] rounded-[8px] bg-white px-3 font-montserrat text-[11px] font-semibold text-greenDark transition hover:bg-greenLight disabled:opacity-60"
+      >
+        {landCoverLoading ? 'Fetching land cover...' : 'Fetch land cover'}
+      </button>
+    </div>
+  );
+}
+
+function ActiveTargetPanel({
+  target,
+  landCoverType,
+}: {
+  target: SoilQueryTarget | null;
+  landCoverType: LandCoverType;
+}) {
+  const targetLabel = getTargetLabel(target);
+  const landCoverLabel = LAND_COVER_OPTIONS.find((option) => option.value === landCoverType)?.label ?? 'Land cover';
+
+  return (
+    <div className="absolute left-6 top-[390px] z-[1000] w-[240px] rounded-[14px] border border-white bg-white/85 p-3 shadow-sm backdrop-blur-[12px]">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-montserrat text-[10px] font-bold uppercase tracking-[0.08em] text-greenDark">
+          Active Target
+        </span>
+        <span className="rounded-full bg-greenLight px-2 py-[2px] font-montserrat text-[9px] font-bold text-greenDark">
+          {targetLabel.radius}
+        </span>
+      </div>
+      <div className="mt-2 font-montserrat text-[13px] font-semibold text-ink">{targetLabel.title}</div>
+      <div className="mt-[2px] font-montserrat text-[10px] font-medium text-muted">{targetLabel.detail}</div>
+      {targetLabel.coord ? (
+        <div className="mt-2 rounded-[8px] bg-white/75 px-2 py-1 font-montserrat text-[10px] font-semibold text-ink">
+          {targetLabel.coord.lat.toFixed(5)}, {targetLabel.coord.lng.toFixed(5)}
+        </div>
+      ) : null}
+      <div className="mt-2 flex items-center justify-between border-t border-white/70 pt-2 font-montserrat text-[10px] font-medium text-muted">
+        <span>Land cover</span>
+        <span className="font-semibold text-ink">{landCoverLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+function SoilIntelligencePanel({
+  soilFeature,
+  soilInfo,
+  loading,
+  error,
+}: {
+  soilFeature: GeoJsonFeature<SoilPolygonProperties> | null;
+  soilInfo: unknown;
+  loading: boolean;
+  error: string | null;
+}) {
+  if (!loading && !error && !soilFeature && !soilInfo) {
+    return null;
+  }
+
+  const props = soilFeature?.properties;
+  const soilRecord = getSoilInfoRecord(soilInfo);
+  const rows = [
+    ['Dominant soil', props?.Dom_Soil],
+    ['Soil symbol', props?.Dom_Soil_Sym],
+    ['MU Global', props?.MU_GLOBAL ?? props?.snum],
+    ['Classified value', props?.Indian_Classified_Value],
+  ];
+  const profileRows = [
+    ['Texture', getRecordValue(soilRecord, 'T_TEXTURE')],
+    ['Drainage', getRecordValue(soilRecord, 'DRAINAGE')],
+    ['AWC class', getRecordValue(soilRecord, 'AWC_CLASS')],
+    ['Rooting condition', getRecordValue(soilRecord, 'ROOTS')],
+    ['Soil water regime', getRecordValue(soilRecord, 'SWR')],
+    ['Topsoil USDA texture', getRecordValue(soilRecord, 'T_USDA_TEX_CLASS')],
+    ['Subsoil USDA texture', getRecordValue(soilRecord, 'S_USDA_TEX_CLASS')],
+    ['Additional properties', getRecordValue(soilRecord, 'ADD_PROP')],
+  ].filter(([, value]) => value !== undefined && value !== null && value !== '');
+
+  return (
+    <div className="absolute right-6 top-[84px] z-[1000] max-h-[calc(100vh-132px)] w-[300px] overflow-y-auto rounded-[18px] border border-white bg-white/90 p-4 shadow-sm backdrop-blur-[12px]">
+      <div className="font-montserrat text-[14px] font-semibold text-ink">Soil Intelligence</div>
+      {loading ? (
+        <p className="mt-2 font-montserrat text-[12px] text-muted">Loading soil layer and profile...</p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 rounded-[8px] bg-red-50 px-3 py-2 font-montserrat text-[12px] text-red-700">{error}</p>
+      ) : null}
+      {!loading && !error ? (
+        <div className="mt-3 flex flex-col gap-3">
+          <div className="font-montserrat text-[10px] font-bold uppercase tracking-[0.08em] text-greenDark">
+            Soil Summary
+          </div>
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex items-start justify-between gap-3 border-b border-lineLight pb-1 last:border-0">
+              <span className="font-montserrat text-[11px] font-medium text-muted">{label}</span>
+              <span className="max-w-[150px] text-right font-montserrat text-[11px] font-semibold text-ink">
+                {formatSoilInfoValue(value)}
+              </span>
+            </div>
+          ))}
+          {profileRows.length > 0 ? (
+            <div className="mt-1 flex flex-col gap-2 rounded-[10px] bg-greenLight/70 p-3">
+              <div className="font-montserrat text-[10px] font-bold uppercase tracking-[0.08em] text-greenDark">
+                Soil Profile
+              </div>
+              {profileRows.map(([label, value]) => (
+                <div key={label} className="flex items-start justify-between gap-3 border-b border-white/70 pb-1 last:border-0">
+                  <span className="font-montserrat text-[10px] font-medium text-muted">{label}</span>
+                  <span className="max-w-[150px] text-right font-montserrat text-[10px] font-semibold text-ink">
+                    {formatSoilInfoValue(value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : soilInfo ? (
+            <div className="rounded-[8px] bg-greenLight px-3 py-2 font-montserrat text-[11px] font-medium text-greenDark">
+              Detailed soil profile returned, but no displayable profile fields were found.
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -781,13 +1182,49 @@ function CropPlanningSidebar({
 }
 
 
-export function LandIntelligenceClient() {
+type LandIntelligenceClientProps = {
+  mode?: 'land-intelligence' | 'crop-planning-selection';
+};
+
+export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntelligenceClientProps) {
+  const isCropPlanningSelection = mode === 'crop-planning-selection';
+  const showGisIntelligence = !isCropPlanningSelection;
+  const showSelectionSidebar = isCropPlanningSelection;
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [sidebarMode, setSidebarMode] = useState<'selection' | 'crop-planning'>('selection');
   const [savedLandData, setSavedLandData] = useState<{ id: string; owner: string } | null>(null);
+  const [showDistricts, setShowDistricts] = useState(false);
+  const [showSoil, setShowSoil] = useState(false);
+  const [showSavedAreas, setShowSavedAreas] = useState(false);
+  const [showLandCover, setShowLandCover] = useState(false);
+  const [landCoverType, setLandCoverType] = useState<LandCoverType>('forrest_land');
+  const [districtBoundaries, setDistrictBoundaries] = useState<GeoJsonFeatureCollection | null>(null);
+  const [soilCollection, setSoilCollection] = useState<GeoJsonFeatureCollection<SoilPolygonProperties> | null>(null);
+  const [landCoverCollection, setLandCoverCollection] = useState<LandCoverFeatureCollection | null>(null);
+  const [selectedSoilFeature, setSelectedSoilFeature] = useState<GeoJsonFeature<SoilPolygonProperties> | null>(null);
+  const [soilInfo, setSoilInfo] = useState<unknown>(null);
+  const [soilLoading, setSoilLoading] = useState(false);
+  const [landCoverLoading, setLandCoverLoading] = useState(false);
+  const [soilError, setSoilError] = useState<string | null>(null);
+  const [landCoverError, setLandCoverError] = useState<string | null>(null);
+  const [savedAreas, setSavedAreas] = useState<SavedGisArea[]>([]);
+  const [savedAreaError, setSavedAreaError] = useState<string | null>(null);
   
   const handleSaveConfirm = (landId: string, owner: string) => {
     setSavedLandData({ id: landId, owner });
+    void saveGisArea({
+      label: landId,
+      user_name: owner,
+      location_geo_data: polygonToFeatureCollection(polygonCoordsList),
+    })
+      .then(() => getSavedGisAreas())
+      .then((response) => {
+        setSavedAreas(response.data);
+        setSavedAreaError(null);
+      })
+      .catch((error) => {
+        setSavedAreaError(error instanceof Error ? error.message : 'Failed to save GIS area.');
+      });
     setShowSaveModal(false);
     setSidebarMode('crop-planning');
   };
@@ -806,10 +1243,17 @@ export function LandIntelligenceClient() {
   const [drawingCoords, setDrawingCoords] = useState<Coord[]>([]);
   const [pins, setPins] = useState<Coord[]>([]);
   const [mousePos, setMousePos] = useState<Coord | null>(null);
+  const [measurePoints, setMeasurePoints] = useState<Coord[]>([]);
+  const [soilQueryTarget, setSoilQueryTarget] = useState<SoilQueryTarget | null>({
+    type: 'polygon',
+    centroid: getPolygonCentroid(SELECTION_PATH),
+    radiusKm: getSoilRadiusKm(SELECTION_PATH),
+    polygonId: '001',
+  });
 
   // Search state
   const [searchQuery, setSearchQuery] = useState(DEFAULT_LOCATION_LABEL);
-  const [suggestions, setSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+  const [suggestions, setSuggestions] = useState<GeocodingResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -819,10 +1263,16 @@ export function LandIntelligenceClient() {
   const mapRef = useRef<any>(null);
   const polygonRefs = useRef<any[]>([]);
   const drawingLineRef = useRef<any>(null);
+  const measureLineRef = useRef<any>(null);
+  const measureMarkerRefs = useRef<any[]>([]);
   const markerRefs = useRef<any[]>([]);
   const crosshairRefs = useRef<any[]>([]);
   const tileLayerRef = useRef<any>(null);
   const liveCoordRef = useRef<HTMLSpanElement>(null);
+  const districtLayerRef = useRef<any>(null);
+  const soilLayerRef = useRef<any>(null);
+  const landCoverLayerRef = useRef<any>(null);
+  const savedAreasLayerRef = useRef<any>(null);
 
   const areaSqm = useMemo(
     () => polygonCoordsList.reduce((total, poly) => total + computePolygonAreaSqm(poly.coords), 0),
@@ -856,6 +1306,113 @@ export function LandIntelligenceClient() {
     }
     mapRef.current.panTo([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng]);
     fitSelectionBounds();
+  };
+
+  const fetchSoilIntelligence = useCallback(async (targetOverride?: SoilQueryTarget) => {
+    const fallbackCenter = mapRef.current?.getCenter?.();
+    const target = targetOverride ?? soilQueryTarget ?? {
+      type: 'map-center',
+      coord: fallbackCenter ? { lat: fallbackCenter.lat, lng: fallbackCenter.lng } : getSelectionCentroid(polygonCoordsList),
+      radiusKm: 2,
+    };
+    const coord = getSoilTargetCoord(target);
+
+    setSoilLoading(true);
+    setSoilError(null);
+    setShowSoil(true);
+
+    try {
+      const soilResponse = await getSoilPolygon(coord.lat, coord.lng, target.radiusKm);
+      setSoilCollection(soilResponse.data);
+      const firstFeature = soilResponse.data.features[0] ?? null;
+      setSelectedSoilFeature(firstFeature);
+
+      const soilId = findFirstSoilGlobalId(soilResponse.data);
+      if (soilId) {
+        const infoResponse = await getSoilInfo(soilId);
+        setSoilInfo(infoResponse.data);
+      } else {
+        setSoilInfo(null);
+      }
+    } catch (error) {
+      setSoilError(error instanceof Error ? error.message : 'Failed to fetch soil intelligence.');
+    } finally {
+      setSoilLoading(false);
+    }
+  }, [polygonCoordsList, soilQueryTarget]);
+
+  const fetchLandCover = useCallback(async (targetOverride?: SoilQueryTarget) => {
+    const fallbackCenter = mapRef.current?.getCenter?.();
+    const target = targetOverride ?? soilQueryTarget ?? {
+      type: 'map-center',
+      coord: fallbackCenter ? { lat: fallbackCenter.lat, lng: fallbackCenter.lng } : getSelectionCentroid(polygonCoordsList),
+      radiusKm: 2,
+    };
+    const coord = getSoilTargetCoord(target);
+
+    setLandCoverLoading(true);
+    setLandCoverError(null);
+    setShowLandCover(true);
+
+    try {
+      const response = await getLandCover(coord.lat, coord.lng, target.radiusKm, landCoverType);
+      setLandCoverCollection(response.data);
+    } catch (error) {
+      setLandCoverError(error instanceof Error ? error.message : 'Failed to fetch land cover.');
+    } finally {
+      setLandCoverLoading(false);
+    }
+  }, [landCoverType, polygonCoordsList, soilQueryTarget]);
+
+  const clearTransientMapState = () => {
+    setDrawingCoords([]);
+    setIsDrawing(false);
+    setPins([]);
+    setMousePos(null);
+    setMeasurePoints([]);
+    setSoilQueryTarget(null);
+    setSoilCollection(null);
+    setSelectedSoilFeature(null);
+    setSoilInfo(null);
+    setSoilError(null);
+    setLandCoverError(null);
+    setShowSoil(false);
+    setShowLandCover(false);
+    setLandCoverCollection(null);
+  };
+
+  const setAnalysisTarget = useCallback((target: SoilQueryTarget | null, options?: { keepResults?: boolean }) => {
+    setSoilQueryTarget(target);
+
+    if (options?.keepResults) {
+      return;
+    }
+
+    setSoilCollection(null);
+    setSelectedSoilFeature(null);
+    setSoilInfo(null);
+    setSoilError(null);
+    setLandCoverCollection(null);
+    setLandCoverError(null);
+    setShowSoil(false);
+    setShowLandCover(false);
+  }, []);
+
+  const handleToolChange = (tool: MapTool) => {
+    if (tool === 'clear') {
+      clearTransientMapState();
+      setActiveTool('cursor');
+      return;
+    }
+    if (tool !== 'draw') {
+      setDrawingCoords([]);
+      setIsDrawing(false);
+      setMousePos(null);
+    }
+    if (tool !== 'measure') {
+      setMeasurePoints([]);
+    }
+    setActiveTool(tool);
   };
 
   // Debounced Nominatim geocoding search
@@ -998,6 +1555,19 @@ export function LandIntelligenceClient() {
 
       if (activeTool === 'pin') {
         setPins(prev => [...prev, coord]);
+        setAnalysisTarget({ type: 'pin', coord, radiusKm: 2 });
+      } else if (activeTool === 'probe') {
+        const target: SoilQueryTarget = { type: 'pin', coord, radiusKm: 2 };
+        setPins(prev => [...prev, coord]);
+        setAnalysisTarget(target, { keepResults: true });
+        void fetchSoilIntelligence(target);
+      } else if (activeTool === 'measure') {
+        setMeasurePoints((prev) => {
+          if (prev.length >= 2) {
+            return [coord];
+          }
+          return [...prev, coord];
+        });
       } else if (activeTool === 'draw') {
         if (!isDrawing) {
           // Start a new drawing without clearing prior polygons.
@@ -1012,7 +1582,14 @@ export function LandIntelligenceClient() {
           if (drawingCoords.length > 1 && distance < 15) {
             setPolygonCoordsList((prev) => {
               const newId = String(prev.length + 1).padStart(3, '0');
-              return [...prev, { id: newId, coords: drawingCoords }];
+              const completedPolygon = { id: newId, coords: drawingCoords };
+              setAnalysisTarget({
+                type: 'polygon',
+                centroid: getPolygonCentroid(completedPolygon.coords),
+                radiusKm: getSoilRadiusKm(completedPolygon.coords),
+                polygonId: newId,
+              });
+              return [...prev, completedPolygon];
             });
             setDrawingCoords([]);
             setIsDrawing(false);
@@ -1044,7 +1621,14 @@ export function LandIntelligenceClient() {
         if (drawingCoords.length > 2) {
           setPolygonCoordsList((prev) => {
             const newId = String(prev.length + 1).padStart(3, '0');
-            return [...prev, { id: newId, coords: drawingCoords }];
+            const completedPolygon = { id: newId, coords: drawingCoords };
+            setAnalysisTarget({
+              type: 'polygon',
+              centroid: getPolygonCentroid(completedPolygon.coords),
+              radiusKm: getSoilRadiusKm(completedPolygon.coords),
+              polygonId: newId,
+            });
+            return [...prev, completedPolygon];
           });
         }
         setDrawingCoords([]);
@@ -1061,7 +1645,7 @@ export function LandIntelligenceClient() {
       map.off('mousemove', onMouseMove);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [mapReady, activeTool, isDrawing, drawingCoords]);
+  }, [mapReady, activeTool, isDrawing, drawingCoords, fetchSoilIntelligence, setAnalysisTarget]);
 
   // Render dynamic elements (Polygon, Preview Line, Pins)
   useEffect(() => {
@@ -1087,6 +1671,18 @@ export function LandIntelligenceClient() {
       // Bind a nice popup showing the Land ID
       polygon.bindPopup(`<strong>Land ID:</strong> ${poly.id}`);
       polygon.bindTooltip(`Land ID: ${poly.id}`, { permanent: false, direction: 'center' });
+
+      polygon.on('click', () => {
+        if (activeTool !== 'cursor') {
+          return;
+        }
+        setAnalysisTarget({
+          type: 'polygon',
+          centroid: getPolygonCentroid(poly.coords),
+          radiusKm: getSoilRadiusKm(poly.coords),
+          polygonId: poly.id,
+        });
+      });
 
       polygon.on('dblclick', (event: any) => {
         if (!canRemoveByClick) {
@@ -1148,7 +1744,53 @@ export function LandIntelligenceClient() {
       markerRefs.current.push(marker);
     });
 
-  }, [polygonCoordsList, drawingCoords, isDrawing, pins, mapReady, mousePos, sidebarCoords, canRemoveByClick]);
+    // 4. Render measurement line and endpoints
+    if (measureLineRef.current) {
+      measureLineRef.current.remove();
+      measureLineRef.current = null;
+    }
+    measureMarkerRefs.current.forEach((marker: any) => marker.remove());
+    measureMarkerRefs.current = [];
+
+    if (measurePoints.length > 0) {
+      const measureIcon = L.divIcon({
+        className: 'custom-measure-icon',
+        html: '<span style="display:block;width:10px;height:10px;border-radius:999px;background:#203A13;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.25)"></span>',
+        iconSize: [10, 10],
+        iconAnchor: [5, 5],
+      });
+
+      measurePoints.forEach((point) => {
+        const marker = L.marker([point.lat, point.lng], { icon: measureIcon, interactive: false }).addTo(map);
+        measureMarkerRefs.current.push(marker);
+      });
+
+      if (measurePoints.length === 2) {
+        const distance = getDistanceMeters(measurePoints[0], measurePoints[1]);
+        const midpoint = {
+          lat: (measurePoints[0].lat + measurePoints[1].lat) / 2,
+          lng: (measurePoints[0].lng + measurePoints[1].lng) / 2,
+        };
+        measureLineRef.current = L.polyline(
+          measurePoints.map(point => [point.lat, point.lng] as [number, number]),
+          {
+            color: 'var(--green-dark-active)',
+            weight: 2,
+            dashArray: '6 5',
+          }
+        ).addTo(map);
+        const labelIcon = L.divIcon({
+          className: 'custom-measure-label',
+          html: `<span style="display:inline-flex;white-space:nowrap;border-radius:8px;background:white;padding:4px 8px;font:600 11px Montserrat, sans-serif;color:#203A13;box-shadow:0 2px 8px rgba(0,0,0,.16)">${formatDistance(distance)}</span>`,
+          iconSize: [80, 24],
+          iconAnchor: [40, 12],
+        });
+        const label = L.marker([midpoint.lat, midpoint.lng], { icon: labelIcon, interactive: false }).addTo(map);
+        measureMarkerRefs.current.push(label);
+      }
+    }
+
+  }, [polygonCoordsList, drawingCoords, isDrawing, pins, mapReady, mousePos, sidebarCoords, canRemoveByClick, activeTool, measurePoints, setAnalysisTarget]);
 
   // Initial fit bounds
   useEffect(() => {
@@ -1183,6 +1825,235 @@ export function LandIntelligenceClient() {
     // Re-add polygon on top after layer swap
     polygonRefs.current.forEach((polygon: any) => polygon.bringToFront());
   }, [mapType]);
+
+  useEffect(() => {
+    if (!showDistricts || districtBoundaries) {
+      return;
+    }
+
+    let cancelled = false;
+    getDistrictBoundaries()
+      .then((response) => {
+        if (!cancelled) {
+          setDistrictBoundaries(response.data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDistrictBoundaries({ type: 'FeatureCollection', features: [] });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showDistricts, districtBoundaries]);
+
+  useEffect(() => {
+    if (!showSavedAreas) {
+      return;
+    }
+
+    let cancelled = false;
+    getSavedGisAreas()
+      .then((response) => {
+        if (!cancelled) {
+          setSavedAreas(response.data);
+          setSavedAreaError(null);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setSavedAreaError(error instanceof Error ? error.message : 'Failed to load saved GIS areas.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showSavedAreas]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !window.L) {
+      return;
+    }
+
+    if (districtLayerRef.current) {
+      districtLayerRef.current.remove();
+      districtLayerRef.current = null;
+    }
+
+    if (!showDistricts || !districtBoundaries) {
+      return;
+    }
+
+    districtLayerRef.current = window.L.geoJSON(districtBoundaries as any, {
+      style: {
+        color: '#356020',
+        weight: 2,
+        fillOpacity: 0,
+        dashArray: '5 4',
+      },
+      onEachFeature: (feature: any, layer: any) => {
+        const districtName = feature?.properties?.dtname;
+        if (districtName) {
+          layer.bindTooltip(String(districtName), { sticky: true });
+        }
+      },
+    }).addTo(mapRef.current);
+
+    return () => {
+      if (districtLayerRef.current) {
+        districtLayerRef.current.remove();
+        districtLayerRef.current = null;
+      }
+    };
+  }, [mapReady, showDistricts, districtBoundaries]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !window.L) {
+      return;
+    }
+
+    if (soilLayerRef.current) {
+      soilLayerRef.current.remove();
+      soilLayerRef.current = null;
+    }
+
+    if (!showSoil || !soilCollection) {
+      return;
+    }
+
+    soilLayerRef.current = window.L.geoJSON(soilCollection as any, {
+      style: (feature: any) => {
+        const properties = feature?.properties ?? {};
+        const red = Number(properties.Red ?? 53);
+        const green = Number(properties.Green ?? 96);
+        const blue = Number(properties.Blue ?? 32);
+        return {
+          color: `rgb(${red}, ${green}, ${blue})`,
+          weight: 2,
+          fillColor: `rgb(${red}, ${green}, ${blue})`,
+          fillOpacity: 0.34,
+        };
+      },
+      onEachFeature: (feature: any, layer: any) => {
+        layer.on('click', () => {
+          setSelectedSoilFeature(feature as GeoJsonFeature<SoilPolygonProperties>);
+        });
+        const label = feature?.properties?.Dom_Soil ?? feature?.properties?.Indian_Classified_Value;
+        if (label) {
+          layer.bindTooltip(String(label), { sticky: true });
+        }
+      },
+    }).addTo(mapRef.current);
+
+    if (soilCollection.features.length > 0) {
+      try {
+        mapRef.current.fitBounds(soilLayerRef.current.getBounds(), { padding: [35, 35] });
+      } catch {
+        // Some upstream soil geometries can be empty.
+      }
+    }
+
+    return () => {
+      if (soilLayerRef.current) {
+        soilLayerRef.current.remove();
+        soilLayerRef.current = null;
+      }
+    };
+  }, [mapReady, showSoil, soilCollection]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !window.L) {
+      return;
+    }
+
+    if (landCoverLayerRef.current) {
+      landCoverLayerRef.current.remove();
+      landCoverLayerRef.current = null;
+    }
+
+    if (!showLandCover || !landCoverCollection) {
+      return;
+    }
+
+    const color = getLandCoverColor(landCoverType);
+    landCoverLayerRef.current = window.L.geoJSON(landCoverCollection as any, {
+      style: {
+        color,
+        weight: 1.6,
+        fillColor: color,
+        fillOpacity: 0.38,
+      },
+      onEachFeature: (feature: any, layer: any) => {
+        const label = feature?.properties?.label
+          ?? feature?.properties?.gridcode
+          ?? landCoverCollection.land_cover_index_type
+          ?? LAND_COVER_OPTIONS.find((option) => option.value === landCoverType)?.label;
+        if (label) {
+          layer.bindTooltip(String(label), { sticky: true });
+        }
+      },
+    }).addTo(mapRef.current);
+
+    if (landCoverCollection.features.length > 0) {
+      try {
+        mapRef.current.fitBounds(landCoverLayerRef.current.getBounds(), { padding: [35, 35] });
+      } catch {
+        // Some upstream geometries can be empty.
+      }
+    }
+
+    return () => {
+      if (landCoverLayerRef.current) {
+        landCoverLayerRef.current.remove();
+        landCoverLayerRef.current = null;
+      }
+    };
+  }, [mapReady, showLandCover, landCoverCollection, landCoverType]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !window.L) {
+      return;
+    }
+
+    if (savedAreasLayerRef.current) {
+      savedAreasLayerRef.current.remove();
+      savedAreasLayerRef.current = null;
+    }
+
+    if (!showSavedAreas || savedAreas.length === 0) {
+      return;
+    }
+
+    const featureCollection: GeoJsonFeatureCollection<JsonObject> = {
+      type: 'FeatureCollection',
+      features: savedAreas.map(savedAreaToFeature).filter((feature): feature is GeoJsonFeature<JsonObject> => Boolean(feature)),
+    };
+
+    savedAreasLayerRef.current = window.L.geoJSON(featureCollection as any, {
+      style: {
+        color: '#f3dd7e',
+        weight: 2,
+        fillColor: '#f3dd7e',
+        fillOpacity: 0.22,
+      },
+      onEachFeature: (feature: any, layer: any) => {
+        const label = feature?.properties?.label ?? feature?.properties?.id;
+        if (label) {
+          layer.bindTooltip(`Saved area: ${label}`, { sticky: true });
+        }
+      },
+    }).addTo(mapRef.current);
+
+    return () => {
+      if (savedAreasLayerRef.current) {
+        savedAreasLayerRef.current.remove();
+        savedAreasLayerRef.current = null;
+      }
+    };
+  }, [mapReady, showSavedAreas, savedAreas]);
 
   return (
     <div className="relative flex h-full min-h-[720px] w-full overflow-hidden bg-panel">
@@ -1289,6 +2160,36 @@ export function LandIntelligenceClient() {
           </div>
         </div>
 
+        {showGisIntelligence ? (
+          <>
+            <GisLayerControls
+              showDistricts={showDistricts}
+              showSoil={showSoil}
+              showSavedAreas={showSavedAreas}
+              showLandCover={showLandCover}
+              landCoverType={landCoverType}
+              onToggleDistricts={() => setShowDistricts((current) => !current)}
+              onToggleSoil={() => setShowSoil((current) => !current)}
+              onToggleSavedAreas={() => setShowSavedAreas((current) => !current)}
+              onToggleLandCover={() => setShowLandCover((current) => !current)}
+              onLandCoverTypeChange={setLandCoverType}
+              onFetchSoil={() => void fetchSoilIntelligence()}
+              onFetchLandCover={() => void fetchLandCover()}
+              soilLoading={soilLoading}
+              landCoverLoading={landCoverLoading}
+            />
+
+            <ActiveTargetPanel target={soilQueryTarget} landCoverType={landCoverType} />
+
+            <SoilIntelligencePanel
+              soilFeature={selectedSoilFeature}
+              soilInfo={soilInfo}
+              loading={soilLoading}
+              error={soilError ?? landCoverError ?? savedAreaError}
+            />
+          </>
+        ) : null}
+
         <MapScaleBar map={mapRef.current} color={mapType === 'satellite' ? 'white' : 'black'} />
 
         <div className="absolute bottom-6 right-8 z-[1000] flex gap-3 drop-shadow-[0_0_10px_rgba(0,0,0,0.06)]">
@@ -1343,30 +2244,35 @@ export function LandIntelligenceClient() {
             </div>
           </button>
 
-          <div className="flex flex-col justify-between h-[52px]">
-            <button
-              type="button"
-              className="flex h-[24px] w-[23px] items-center justify-center rounded-[3px] bg-white transition-colors hover:bg-greenLight"
-              onClick={() => mapRef.current?.setZoom?.(zoom + 1)}
-              aria-label="Zoom in"
-            >
-              <Plus className="h-3 w-3 text-greenDarkActive" strokeWidth={2.5} />
-            </button>
-            <button
-              type="button"
-              className="flex h-[24px] w-[23px] items-center justify-center rounded-[3px] bg-white transition-colors hover:bg-greenLight"
-              onClick={() => mapRef.current?.setZoom?.(zoom - 1)}
-              aria-label="Zoom out"
-            >
-              <Minus className="h-3 w-3 text-greenDarkActive" strokeWidth={2.5} />
-            </button>
-          </div>
+          <MapZoomControls
+            className="h-[52px] w-[23px] justify-between gap-0"
+            buttonClassName="h-[24px] w-[23px] hover:bg-greenLight"
+            iconClassName="h-3 w-3 text-greenDarkActive"
+            onZoomIn={() => mapRef.current?.setZoom?.(zoom + 1)}
+            onZoomOut={() => mapRef.current?.setZoom?.(zoom - 1)}
+          />
         </div>
 
         {activeTool === 'draw' && (
           <div className="absolute bottom-[85px] left-1/2 z-[1000] -translate-x-1/2">
             <span className="rounded-full border border-line bg-white/90 px-4 py-1.5 text-[11px] font-medium shadow-sm backdrop-blur-sm">
-              Release left mouse button to complete polygon
+              Click points on the map, then click near the first point or press Escape to finish
+            </span>
+          </div>
+        )}
+
+        {activeTool === 'probe' && (
+          <div className="absolute bottom-[85px] left-1/2 z-[1000] -translate-x-1/2">
+            <span className="rounded-full border border-line bg-white/90 px-4 py-1.5 text-[11px] font-medium shadow-sm backdrop-blur-sm">
+              Click any map point to fetch soil intelligence
+            </span>
+          </div>
+        )}
+
+        {activeTool === 'measure' && (
+          <div className="absolute bottom-[85px] left-1/2 z-[1000] -translate-x-1/2">
+            <span className="rounded-full border border-line bg-white/90 px-4 py-1.5 text-[11px] font-medium shadow-sm backdrop-blur-sm">
+              Click two map points to measure distance
             </span>
           </div>
         )}
@@ -1381,25 +2287,25 @@ export function LandIntelligenceClient() {
 
         <MapToolbar
           activeTool={activeTool}
-          onToolChange={setActiveTool}
+          onToolChange={handleToolChange}
         />
       </div>
 
-      {sidebarMode === 'selection' ? (
-        <SelectionSidebar
-          areaSqm={areaSqm}
-          coords={sidebarCoords}
-          polygonCount={polygonCoordsList.length}
-          hasSelection={hasSelection}
-          onSave={() => setShowSaveModal(true)}
-        />
-      ) : (
+      {showSelectionSidebar && sidebarMode === 'selection' ? (
+          <SelectionSidebar
+            areaSqm={areaSqm}
+            coords={sidebarCoords}
+            polygonCount={polygonCoordsList.length}
+            hasSelection={hasSelection}
+            onSave={() => setShowSaveModal(true)}
+          />
+      ) : showSelectionSidebar ? (
         <CropPlanningSidebar
           landId={savedLandData?.id || '001'}
           areaSqm={areaSqm}
           onBack={() => setSidebarMode('selection')}
         />
-      )}
+      ) : null}
       <SaveSelectionModal 
         isOpen={showSaveModal} 
         onClose={() => setShowSaveModal(false)} 

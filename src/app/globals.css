@@ -109,3 +109,12 @@ select {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.25);
 }
+
+.climate-risk-light-tiles {
+  filter: grayscale(1) brightness(1.16) contrast(0.82) opacity(0.42);
+}
+
+.climate-risk-map .leaflet-overlay-pane .climate-risk-heat-zone {
+  filter: blur(18px);
+  mix-blend-mode: multiply;
+}
