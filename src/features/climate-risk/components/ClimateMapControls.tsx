@@ -1,9 +1,9 @@
-import { CloudRain, Sun, Wind } from 'lucide-react';
+import React from 'react';
+import { CloudRain, Sun, Wind, Satellite, Radar, Droplets, Thermometer, Gauge, ChevronUp } from 'lucide-react';
 
-import { MapLayerThumbnailToggle, MapZoomControls } from '@/components/ui/map-controls';
 import { cn } from '@/lib/utils';
 
-export type ClimateLayer = 'temperature' | 'precipitation' | 'wind';
+export type ClimateLayer = 'temperature' | 'precipitation' | 'wind' | 'radar' | 'humidity' | 'pressure';
 export type ClimateBaseLayer = 'satellite' | 'street' | 'topographic';
 
 const BASE_LAYER_THUMBNAILS: Record<ClimateBaseLayer, string> = {
@@ -25,7 +25,7 @@ function nextBaseLayer(baseLayer: ClimateBaseLayer): ClimateBaseLayer {
 }
 
 function ClimateLayerLegend({ activeLayer }: { activeLayer: ClimateLayer }) {
-  const legendByLayer = {
+  const legendByLayer: Record<ClimateLayer, { label: string, min: string, max: string, minClass: string, maxClass: string, bg: string }> = {
     temperature: {
       label: 'Temperature',
       min: '30°C',
@@ -50,7 +50,31 @@ function ClimateLayerLegend({ activeLayer }: { activeLayer: ClimateLayer }) {
       maxClass: 'text-white',
       bg: 'bg-[linear-gradient(90deg,#F0FDFA_0%,#0D9488_100%)]',
     },
-  } as const;
+    radar: {
+      label: 'Radar',
+      min: 'Light',
+      max: 'Heavy',
+      minClass: 'text-white/80',
+      maxClass: 'text-white',
+      bg: 'bg-[linear-gradient(90deg,#0000FF_0%,#FF0000_50%,#FFFF00_100%)]',
+    },
+    humidity: {
+      label: 'Humidity',
+      min: '0%',
+      max: '100%',
+      minClass: 'text-black/80',
+      maxClass: 'text-white',
+      bg: 'bg-[linear-gradient(90deg,#E0F2FE_0%,#0284C7_100%)]',
+    },
+    pressure: {
+      label: 'Pressure',
+      min: '980 hPa',
+      max: '1040 hPa',
+      minClass: 'text-black/80',
+      maxClass: 'text-white',
+      bg: 'bg-[linear-gradient(90deg,#F0FDFA_0%,#0D9488_100%)]',
+    },
+  };
   const activeLegend = legendByLayer[activeLayer];
 
   return (
@@ -80,31 +104,78 @@ export function ClimateMapControls({
 }) {
   const nextLayer = nextBaseLayer(baseLayer);
 
+  const [menuOpen, setMenuOpen] = React.useState(true);
+
   return (
     <>
       <ClimateLayerLegend activeLayer={activeLayer} />
 
-      <div className="absolute bottom-[13px] left-1/2 z-[400] flex h-[42px] w-[105px] -translate-x-1/2 items-center rounded-[14px] border border-black/5 bg-white px-[4px] shadow-[0_4px_14px_rgba(0,0,0,0.1)]">
-        <button onClick={() => setActiveLayer('temperature')} className={cn('grid h-[33px] w-[32px] place-items-center rounded-[10px] transition duration-200', activeLayer === 'temperature' ? 'bg-[#407327] text-white shadow-sm' : 'text-black/50 hover:bg-black/5')} aria-label="Temperature layer"><Sun className="h-4 w-4" strokeWidth={1.5} /></button>
-        <button onClick={() => setActiveLayer('wind')} className={cn('grid h-[33px] w-[33px] place-items-center rounded-[10px] transition duration-200', activeLayer === 'wind' ? 'bg-[#407327] text-white shadow-sm' : 'text-black/50 hover:bg-black/5')} aria-label="Wind layer"><Wind className="h-4 w-4" strokeWidth={1.4} /></button>
-        <button onClick={() => setActiveLayer('precipitation')} className={cn('grid h-[33px] w-[32px] place-items-center rounded-[10px] transition duration-200', activeLayer === 'precipitation' ? 'bg-[#407327] text-white shadow-sm' : 'text-black/50 hover:bg-black/5')} aria-label="Rain layer"><CloudRain className="h-4 w-4" strokeWidth={1.5} /></button>
+      {/* Layer Controls (Zoom Earth Style) */}
+      <div className="absolute top-[20px] left-[20px] z-[400] w-[210px] rounded-[12px] border border-white/10 bg-[#2a2d2a]/95 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.6)] text-white font-montserrat overflow-hidden transition-all">
+        
+        {/* Header */}
+        <button 
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="flex w-full items-center justify-between px-[16px] py-[14px] hover:bg-white/5 transition-colors"
+        >
+          <span className="text-[11px] font-bold tracking-widest text-white/80 uppercase">Weather Maps</span>
+          <ChevronUp className={cn("h-4 w-4 text-white/60 transition-transform", !menuOpen && "rotate-180")} />
+        </button>
+
+        {menuOpen && (
+          <div className="px-[12px] pb-[12px] flex flex-col gap-[2px]">
+            {/* Base Layer Selection */}
+            <button 
+              onClick={onCycleBaseLayer}
+              className={cn("flex items-center gap-[12px] rounded-full px-[12px] py-[8px] transition-colors mb-[8px]", baseLayer === 'satellite' ? "bg-white/20" : "hover:bg-white/10")}
+            >
+              <Satellite className="h-[18px] w-[18px] text-white/90" />
+              <span className="text-[14px] font-medium text-white/90">{BASE_LAYER_LABELS[baseLayer]}</span>
+            </button>
+
+            {/* Live/HD mock links */}
+            <div className="flex flex-col gap-2 pl-[42px] mb-[16px]">
+              <div className="flex items-center gap-2 text-[13px] font-medium text-white/90">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                Live
+              </div>
+              <div className="flex items-center gap-2 text-[13px] font-medium text-white/40">
+                <span className="w-[12px]"></span>
+                HD
+              </div>
+            </div>
+
+            {/* Weather Layers */}
+            <LayerMenuItem icon={<Radar className="h-[18px] w-[18px]" />} label="Radar" layerId="radar" activeLayer={activeLayer} setActiveLayer={setActiveLayer} />
+            <LayerMenuItem icon={<CloudRain className="h-[18px] w-[18px]" />} label="Precipitation" layerId="precipitation" activeLayer={activeLayer} setActiveLayer={setActiveLayer} />
+            <LayerMenuItem icon={<Wind className="h-[18px] w-[18px]" />} label="Wind" layerId="wind" activeLayer={activeLayer} setActiveLayer={setActiveLayer} />
+            <LayerMenuItem icon={<Thermometer className="h-[18px] w-[18px]" />} label="Temperature" layerId="temperature" activeLayer={activeLayer} setActiveLayer={setActiveLayer} />
+            <LayerMenuItem icon={<Droplets className="h-[18px] w-[18px]" />} label="Humidity" layerId="humidity" activeLayer={activeLayer} setActiveLayer={setActiveLayer} />
+            <LayerMenuItem icon={<Gauge className="h-[18px] w-[18px]" />} label="Pressure" layerId="pressure" activeLayer={activeLayer} setActiveLayer={setActiveLayer} />
+
+          </div>
+        )}
       </div>
 
-      <div className="absolute bottom-[13px] right-[346px] z-[400] flex h-[36px] items-start gap-[4px] xl:right-[364px]">
-        <MapLayerThumbnailToggle
-          label={BASE_LAYER_LABELS[baseLayer]}
-          nextLabel={BASE_LAYER_LABELS[nextLayer]}
-          onToggle={onCycleBaseLayer}
-          currentPreview={
-            <img src={BASE_LAYER_THUMBNAILS[baseLayer]} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" draggable={false} />
-          }
-          nextPreview={
-            <img src={BASE_LAYER_THUMBNAILS[nextLayer]} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" draggable={false} />
-          }
-        />
-        <MapZoomControls onZoomIn={onZoomIn} onZoomOut={onZoomOut} />
+      {/* Zoom Controls (Bottom Right) */}
+      <div className="absolute bottom-[20px] right-[20px] z-[400] rounded-[8px] border border-white/10 bg-[#1a1c1a]/80 backdrop-blur-md shadow-lg overflow-hidden flex flex-col">
+        <button onClick={onZoomIn} className="flex h-[32px] w-[32px] items-center justify-center text-white/70 hover:bg-white/10 hover:text-white transition-colors border-b border-white/10 font-bold">+</button>
+        <button onClick={onZoomOut} className="flex h-[32px] w-[32px] items-center justify-center text-white/70 hover:bg-white/10 hover:text-white transition-colors font-bold">−</button>
       </div>
     </>
+  );
+}
+
+function LayerMenuItem({ icon, label, layerId, activeLayer, setActiveLayer }: { icon: React.ReactNode, label: string, layerId: ClimateLayer, activeLayer: ClimateLayer, setActiveLayer: (l: ClimateLayer) => void }) {
+  const active = activeLayer === layerId;
+  return (
+    <button 
+      onClick={() => setActiveLayer(layerId)}
+      className={cn("flex items-center gap-[12px] rounded-[8px] px-[12px] py-[10px] transition-colors", active ? "text-white bg-white/10" : "text-white/70 hover:bg-white/5 hover:text-white")}
+    >
+      {icon}
+      <span className="text-[14px] font-medium">{label}</span>
+    </button>
   );
 }
 

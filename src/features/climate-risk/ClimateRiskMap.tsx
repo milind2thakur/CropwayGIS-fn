@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Circle, MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
+import { Circle, MapContainer, TileLayer, Polygon, Marker, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -48,13 +48,56 @@ function MapZoomController({
   return null;
 }
 
+import type { ClimateLayer } from './components/ClimateMapControls';
+import type { MapOverlays } from './components/MapOverlaysPanel';
+
+const RADAR_STATIONS = [
+  { name: 'Raipur', center: [21.2517, 81.6304] as [number, number] },
+  { name: 'Delhi', center: [28.6139, 77.2090] as [number, number] },
+  { name: 'Mumbai', center: [19.0760, 72.8777] as [number, number] },
+  { name: 'Kolkata', center: [22.5726, 88.3639] as [number, number] },
+  { name: 'Chennai', center: [13.0827, 80.2707] as [number, number] },
+];
+
+const ACTIVE_FIRES_ZONES = [
+  { center: [21.35, 81.75] as [number, number], name: 'Raipur Farm Area' },
+  { center: [21.15, 81.5] as [number, number], name: 'Bhilai Outskirts' },
+  { center: [21.45, 81.4] as [number, number], name: 'Dhamdha Farms' },
+];
+
 interface ClimateRiskMapProps {
   baseLayer: 'satellite' | 'street' | 'topographic';
-  activeLayer: 'temperature' | 'precipitation' | 'wind';
+  activeLayer: ClimateLayer;
+  radarTimestamp?: number | null;
+  selectedLocation?: { lat: number; lon: number } | null;
   zoomTrigger: 'in' | 'out' | null;
   onZoomTriggerHandled: () => void;
   onMapReady?: (map: L.Map) => void;
+  onLocationClick?: (lat: number, lon: number) => void;
+  overlays?: MapOverlays;
 }
+
+// Click handler component
+function MapClickHandler({ onClick }: { onClick: (lat: number, lon: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
+// Fly-to component for when location changes
+function FlyToLocation({ lat, lon }: { lat: number; lon: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.flyTo([lat, lon], map.getZoom(), { duration: 1.5 });
+  }, [lat, lon, map]);
+  return null;
+}
+
+
+import Script from 'next/script';
 
 const layerMap: Record<string, string> = {
   temperature: 'temp_new',
@@ -62,15 +105,87 @@ const layerMap: Record<string, string> = {
   wind: 'wind_new',
 };
 
+function RainViewerLayer({ timestamp }: { timestamp: number }) {
+  return (
+    <TileLayer
+      key={timestamp}
+      url={`https://tilecache.rainviewer.com/v2/radar/${timestamp}/256/{z}/{x}/{y}/2/1_1.png`}
+      opacity={0.6}
+      attribution="&copy; RainViewer"
+      zIndex={10}
+    />
+  );
+}
+
+function WindVelocityLayer() {
+  const map = useMap();
+  const [loaded, setLoaded] = React.useState(false);
+
+  React.useEffect(() => {
+    // Expose L to window for leaflet-velocity
+    if (typeof window !== 'undefined' && !window.L) {
+      window.L = L;
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!loaded) return;
+    // @ts-expect-error L.velocityLayer is added by plugin
+    if (typeof window === 'undefined' || !window.L || !window.L.velocityLayer) return;
+
+    let velocityLayer: any;
+    
+    // Using a sample public GFS wind dataset for the demo
+    fetch('https://raw.githubusercontent.com/danwild/wind-js-server/master/demo/weather/water-gfs.json')
+      .then(res => res.json())
+      .then(data => {
+        // @ts-expect-error L.velocityLayer is added by plugin
+        velocityLayer = window.L.velocityLayer({
+          displayValues: true,
+          displayOptions: {
+            velocityType: 'Global Wind',
+            displayPosition: 'bottomleft',
+            displayEmptyString: 'No wind data'
+          },
+          data: data,
+          maxVelocity: 15,
+          colorScale: ['#ffffff', '#e0f7fa', '#b2ebf2', '#80deea', '#4dd0e1', '#26c6da', '#00bcd4', '#00acc1', '#0097a7', '#00838f', '#006064']
+        });
+        
+        velocityLayer.addTo(map);
+      })
+      .catch(console.error);
+
+    return () => {
+      if (velocityLayer && map) {
+        map.removeLayer(velocityLayer);
+      }
+    };
+  }, [loaded, map]);
+
+  return (
+    <>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-velocity@1.6.0/dist/leaflet-velocity.min.css" />
+      <Script 
+        src="https://cdn.jsdelivr.net/npm/leaflet-velocity@1.6.0/dist/leaflet-velocity.min.js" 
+        strategy="lazyOnload"
+        onLoad={() => setLoaded(true)}
+      />
+    </>
+  );
+}
+
 export function ClimateRiskMap({
   baseLayer,
   activeLayer,
+  radarTimestamp,
+  selectedLocation,
   zoomTrigger,
   onZoomTriggerHandled,
   onMapReady,
+  onLocationClick,
+  overlays,
 }: ClimateRiskMapProps) {
-  const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
-
   // Resolve Leaflet marker icons in Next.js environment
   useEffect(() => {
     // @ts-expect-error Leaflet's internal icon URL cache is not part of the public type.
@@ -107,7 +222,7 @@ export function ClimateRiskMap({
           onMapReady?.(event.target);
         }}
       >
-        {/* Base Map: Satellite Imagery */}
+        {/* Base Map */}
         <TileLayer
           key={baseLayer}
           url={baseLayerUrlByType[baseLayer]}
@@ -115,14 +230,71 @@ export function ClimateRiskMap({
           className={activeLayer === 'temperature' ? 'climate-risk-light-tiles' : undefined}
         />
 
-        {/* OpenWeather Map overlay layer if key is present */}
-        {apiKey && (
+        {/* Labels Overlay */}
+        {overlays?.labels && baseLayer === 'satellite' && (
           <TileLayer
-            key={activeLayer}
-            url={`https://tile.openweathermap.org/map/${layerMap[activeLayer]}/{z}/{x}/{y}.png?appid=${apiKey}`}
-            opacity={0.55}
-            attribution="&copy; OpenWeatherMap"
+            url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+            attribution="&copy; Esri, HERE, Garmin"
+            zIndex={20}
           />
+        )}
+
+        {/* Rain Radar Animation */}
+        {((activeLayer === 'precipitation' || activeLayer === 'radar') || overlays?.rainAnimation) && radarTimestamp && (
+          <RainViewerLayer timestamp={radarTimestamp} />
+        )}
+        
+        {/* Wind Animation */}
+        {(activeLayer === 'wind' || overlays?.windAnimation) && <WindVelocityLayer />}
+
+        {/* Radar Coverage Circles */}
+        {overlays?.radarCoverage && (
+          <>
+            {RADAR_STATIONS.map((station) => (
+              <React.Fragment key={station.name}>
+                <Circle
+                  center={station.center}
+                  radius={250000} // 250km
+                  pathOptions={{
+                    color: 'rgba(34, 197, 94, 0.4)',
+                    weight: 1.5,
+                    dashArray: '5, 5',
+                    fillColor: 'rgba(34, 197, 94, 0.04)',
+                    fillOpacity: 0.15,
+                  }}
+                />
+                <Circle
+                  center={station.center}
+                  radius={3000} // 3km center point
+                  pathOptions={{
+                    color: '#22c55e',
+                    weight: 2,
+                    fillColor: '#ffffff',
+                    fillOpacity: 1,
+                  }}
+                />
+              </React.Fragment>
+            ))}
+          </>
+        )}
+
+        {/* Active Fires Circles */}
+        {overlays?.activeFires && (
+          <>
+            {ACTIVE_FIRES_ZONES.map((fire, idx) => (
+              <Circle
+                key={idx}
+                center={fire.center}
+                radius={12000}
+                pathOptions={{
+                  color: '#ef4444',
+                  weight: 1.5,
+                  fillColor: '#f97316',
+                  fillOpacity: 0.6,
+                }}
+              />
+            ))}
+          </>
         )}
 
         {activeLayer === 'temperature' && (
@@ -154,9 +326,31 @@ export function ClimateRiskMap({
           }}
         />
 
+        {/* Location Marker */}
+        {selectedLocation && (
+          <>
+            <Marker position={[selectedLocation.lat, selectedLocation.lon]} />
+            <FlyToLocation lat={selectedLocation.lat} lon={selectedLocation.lon} />
+          </>
+        )}
+
+        {/* Map Click Handler */}
+        {onLocationClick && <MapClickHandler onClick={onLocationClick} />}
+
         {/* Map Zoom Controller */}
         <MapZoomController zoomTrigger={zoomTrigger} onTriggerHandled={onZoomTriggerHandled} />
       </MapContainer>
+
+      {/* Crosshair Overlay */}
+      {overlays?.crosshair && (
+        <div className="absolute inset-0 pointer-events-none z-[500] flex items-center justify-center">
+          <div className="relative h-[24px] w-[24px]">
+            <div className="absolute left-[11px] top-0 bottom-0 w-[2px] bg-white shadow-[0_0_3px_rgba(0,0,0,0.8)]" />
+            <div className="absolute top-[11px] left-0 right-0 h-[2px] bg-white shadow-[0_0_3px_rgba(0,0,0,0.8)]" />
+            <div className="absolute left-[7px] top-[7px] h-[10px] w-[10px] rounded-full border-2 border-white shadow-[0_0_3px_rgba(0,0,0,0.8)]" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,8 @@
 import { apiFetch } from './client';
+import type { SoilDepthValue, SoilInfoEnvelope } from '@/features/land-intelligence/soilIntelligence.types';
+
+export type { SoilInfoEnvelope, SoilDepthValue };
+
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
@@ -240,4 +244,32 @@ export async function deleteSavedGisArea(id: number): Promise<ApiEnvelope<JsonOb
   return apiFetch(`/api/v1/land-intelligence/gis/saved-areas/${id}/`, {
     method: 'DELETE',
   });
+}
+
+/**
+ * Fetch normalised soil intelligence (SoilGrids hybrid envelope).
+ *
+ * Passes lat/lon/depth/radius to the backend service, which will:
+ *   - Always call the Node backend for the legacy mu_global_id soil record.
+ *   - Optionally enrich with SoilGrids (when SOILGRIDS_ENABLED on server).
+ *   - Return a normalised SoilInfoEnvelope with kpis, source, uncertainty, advisory.
+ */
+export async function getSoilIntelligence(
+  muGlobalId: string | number,
+  options: {
+    lat: number;
+    lon: number;
+    depth?: SoilDepthValue;
+    radius?: number;
+  }
+): Promise<ApiEnvelope<SoilInfoEnvelope>> {
+  const params = new URLSearchParams({
+    lat: String(options.lat),
+    lon: String(options.lon),
+    ...(options.depth ? { depth: options.depth } : {}),
+    ...(options.radius != null ? { radius: String(options.radius) } : {}),
+  });
+  return apiFetch(
+    `/api/v1/land-intelligence/gis/soil-info/${encodeURIComponent(String(muGlobalId))}/?${params.toString()}`
+  );
 }

@@ -1,5 +1,4 @@
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
-import Link from 'next/link';
 
 interface FertilizerCalculatorModalProps {
   isOpen: boolean;
@@ -24,8 +23,8 @@ export function FertilizerCalculatorModal({ isOpen, onClose }: FertilizerCalcula
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 p-4">
-      <div className="relative h-[491px] w-[559px] overflow-hidden rounded-[20px] bg-white font-montserrat">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/20 p-3 sm:p-4">
+      <div className="relative max-h-[calc(100dvh-24px)] w-full max-w-[559px] overflow-y-auto rounded-[20px] bg-white pb-[64px] font-montserrat sm:h-[491px] sm:overflow-hidden sm:pb-0">
         <button
           type="button"
           onClick={onClose}
@@ -38,8 +37,8 @@ export function FertilizerCalculatorModal({ isOpen, onClose }: FertilizerCalcula
         <div className="px-[19px] pt-[14px]">
           <h2 className="text-[18px] font-medium leading-[130%] text-black">Fertilizer Calculator</h2>
 
-          <div className="mt-[22px] flex items-end gap-[30px]">
-            <div className="w-[194px]">
+          <div className="mt-[22px] flex flex-wrap items-end gap-[16px] sm:gap-[30px]">
+            <div className="w-full max-w-[194px]">
               <label className="mb-[5px] block text-[10px] font-medium leading-[130%] text-black/50">Growth Stage</label>
               <button className="flex h-[26px] w-full items-center justify-between rounded-[6px] bg-[#C6D8BD] px-[10px] text-[#203A13]">
                 <span className="text-[12px] font-medium leading-[130%]">Sowing</span>
@@ -58,17 +57,17 @@ export function FertilizerCalculatorModal({ isOpen, onClose }: FertilizerCalcula
 
           <h3 className="mt-[32px] text-[12px] font-medium leading-[130%] text-black">Nutrients Recommended</h3>
 
-          <div className="mt-[3px] flex h-[79px] w-[522px] items-center rounded-[9px] border border-[#DADADA] px-[17px]">
-            <div className="flex w-full justify-between">
-              <div className="w-[141px]">
+          <div className="mt-[3px] flex min-h-[79px] w-full items-center rounded-[9px] border border-[#DADADA] px-[17px]">
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-between">
+              <div className="w-full sm:w-[141px]">
                 <div className="mb-[3px] text-[12px] font-medium leading-[130%] text-black">Nitrogen N</div>
                 <StepperField value="100 KG" />
               </div>
-              <div className="w-[141px]">
+              <div className="w-full sm:w-[141px]">
                 <div className="mb-[3px] text-[12px] font-medium leading-[130%] text-black">Phosphorus P₂O₅</div>
                 <StepperField value="50 KG" />
               </div>
-              <div className="w-[141px]">
+              <div className="w-full sm:w-[141px]">
                 <div className="mb-[3px] text-[12px] font-medium leading-[130%] text-black">Potassium K₂O</div>
                 <StepperField value="50 KG" />
               </div>
@@ -79,8 +78,8 @@ export function FertilizerCalculatorModal({ isOpen, onClose }: FertilizerCalcula
         <div className="mt-[32px] px-[19px]">
           <h3 className="text-[12px] font-medium leading-[130%] text-black">Fertilizers Required</h3>
 
-          <div className="mt-[20px] w-[522px]">
-            <div className="grid grid-cols-[119px_90px_1fr] border-b border-black/20 pb-[6px] pl-[21px] text-[10px] font-medium leading-[130%] text-black/50">
+          <div className="mt-[20px] w-full overflow-x-auto">
+            <div className="grid min-w-[420px] grid-cols-[119px_90px_1fr] border-b border-black/20 pb-[6px] pl-[21px] text-[10px] font-medium leading-[130%] text-black/50">
               <span>Fertilizers</span>
               <span>Quantity</span>
               <span>Nutrients contents</span>
@@ -93,7 +92,7 @@ export function FertilizerCalculatorModal({ isOpen, onClose }: FertilizerCalcula
             ].map(([name, quantity, content], i, arr) => (
               <div
                 key={name}
-                className={`grid h-[38px] grid-cols-[119px_90px_1fr] items-center pl-[21px] text-[12px] leading-[130%] ${
+                className={`grid h-[38px] min-w-[420px] grid-cols-[119px_90px_1fr] items-center pl-[21px] text-[12px] leading-[130%] ${
                   i !== arr.length - 1 ? 'border-b border-black/20' : ''
                 }`}
               >
@@ -105,7 +104,7 @@ export function FertilizerCalculatorModal({ isOpen, onClose }: FertilizerCalcula
             <div className="border-t border-black/20" />
           </div>
 
-          <div className="absolute bottom-[15px] right-[20px] flex items-center gap-[8px]">
+          <div className="absolute bottom-[15px] left-[20px] right-[20px] flex flex-wrap justify-end gap-[8px]">
             <button
               type="button"
               className="flex h-[26px] w-[110px] items-center justify-center rounded-[6px] bg-[#E3ECDF] text-[12px] font-medium leading-[130%] text-[#203A13] transition-opacity hover:opacity-80"
@@ -124,4 +123,3 @@ export function FertilizerCalculatorModal({ isOpen, onClose }: FertilizerCalcula
     </div>
   );
 }
-

@@ -16,9 +16,9 @@ function Metric({
   value: string;
   active?: boolean;
 }) {
-  const iconClass = active ? 'text-white' : 'text-[#222222]';
-  const labelClass = active ? 'text-white/60' : 'text-black/55';
-  const valueClass = active ? 'text-white' : 'text-black';
+  const iconClass = active ? 'text-white' : 'text-white/60';
+  const labelClass = active ? 'text-white/80' : 'text-white/50';
+  const valueClass = active ? 'text-white' : 'text-white/90';
 
   return (
     <div className="flex min-w-0 flex-col gap-[2px]">
@@ -44,28 +44,31 @@ export function ForecastCard({ day }: { day: WeatherDailyItem }) {
   };
 
   return (
-    <div className={cn('flex h-[90px] w-full shrink-0 flex-col rounded-[11px] px-[11px] py-[9px] transition-all duration-200', active ? 'bg-[#407327] shadow-[0_5px_14px_rgba(32,58,19,0.26)]' : 'bg-[#F0F2EF] border border-black/5')}>
-      <div className="flex min-w-0 items-start gap-[8px]">
-        <WeatherIcon icon={day.condition} className={cn('mt-[5px] h-[24px] w-[24px] shrink-0 opacity-70', active ? 'text-white' : 'text-[#222222]')} />
-        <div className="flex w-[58px] shrink-0 items-start gap-[1px]">
-          <div className={cn('font-montserrat text-[28px] font-medium leading-none', active ? 'text-white' : 'text-black')}>
-            {day.temp_c}°
-          </div>
-          <Thermometer className={cn('mt-[3px] h-[11px] w-[11px] shrink-0', active ? 'text-white' : 'text-[#222222]')} strokeWidth={1.3} />
+    <div className={cn('flex h-[42px] w-full shrink-0 items-center justify-between rounded-[8px] px-[12px] transition-all duration-200', active ? 'bg-white/10 border border-white/20' : 'bg-transparent border border-transparent')}>
+      
+      {/* Day label */}
+      <div className="w-[40px] shrink-0 font-montserrat text-[12px] font-medium text-white/90">
+        {day.day_label}
+      </div>
+
+      {/* Icon */}
+      <WeatherIcon icon={day.condition} className={cn('h-[20px] w-[20px] shrink-0', active ? 'text-white' : 'text-white/70')} />
+
+      {/* Wind & Rain Mini-Metrics */}
+      <div className="flex w-[80px] shrink-0 items-center gap-[8px] opacity-80">
+        <div className="flex items-center gap-[3px] text-white/80">
+          <Wind className="h-[10px] w-[10px]" strokeWidth={1.5} />
+          <span className="font-montserrat text-[9px]">{day.wind_mph}</span>
         </div>
-        <div className="grid min-w-0 flex-1 grid-cols-[0.84fr_0.78fr_1.15fr] gap-[5px] pt-[1px]">
-          <Metric type="wind" label="Wind" value={`${day.wind_mph} mph`} active={active} />
-          <Metric type="rain" label="Rain" value={`${day.rain_mm} mm`} active={active} />
-          <Metric type="humidity" label="Humidity" value={`${day.humidity_gm3} g/m³`} active={active} />
+        <div className="flex items-center gap-[3px] text-white/80">
+          <CloudRain className="h-[10px] w-[10px]" strokeWidth={1.5} />
+          <span className="font-montserrat text-[9px]">{day.rain_mm}</span>
         </div>
       </div>
-      <div className="mt-[6px] flex min-w-0 items-start gap-[8px] pl-[34px]">
-        <span className={cn('w-[36px] shrink-0 font-montserrat text-[9px] font-semibold leading-[120%] opacity-70', active ? 'text-white' : 'text-black')}>
-          {day.day_label}
-        </span>
-        <p className={cn('line-clamp-2 min-w-0 font-montserrat text-[9px] font-medium leading-[125%]', active ? 'text-white' : 'text-[#222222]')}>
-          {getAlertMessage()}
-        </p>
+
+      {/* Temperature */}
+      <div className="w-[45px] shrink-0 text-right font-montserrat text-[14px] font-semibold text-white/90">
+        {day.temp_c}°
       </div>
     </div>
   );

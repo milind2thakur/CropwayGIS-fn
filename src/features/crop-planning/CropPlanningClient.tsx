@@ -126,13 +126,13 @@ export function CropPlanningClient() {
   const shouldScrollCalculator = state.lines.length > 4;
 
   return (
-    <div className="h-full w-full overflow-hidden bg-canvas p-5 lg:p-6">
-      <div className="relative flex h-full w-full flex-col overflow-hidden rounded-[16px] border border-black/10 bg-white p-6 shadow-sm lg:p-8">
+    <div className="h-full w-full overflow-x-hidden overflow-y-auto bg-canvas p-3 sm:p-5 lg:p-6">
+      <div className="relative flex min-h-full w-full flex-col overflow-hidden rounded-[16px] border border-black/10 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
         <div className="flex flex-col h-full min-h-0">
           <div className="shrink-0">
             <h1 className="font-montserrat text-[14px] font-medium text-black">Plan Crop</h1>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
-              <div className="relative h-[28px] w-[272px] shrink-0">
+              <div className="relative h-[28px] w-full shrink-0 sm:w-[272px]">
                 <input
                   value={state.search}
                   onChange={(event) => dispatch({ type: 'setSearch', payload: event.target.value })}
@@ -141,14 +141,14 @@ export function CropPlanningClient() {
                 />
                 <Search className="pointer-events-none absolute right-[10px] top-1/2 h-3 w-3 -translate-y-1/2 text-ink" />
               </div>
-              <div className="flex h-[26px] items-center gap-[2px] rounded-[8px] bg-greenLight p-[2px]">
+              <div className="flex h-[26px] w-full items-center gap-[2px] rounded-[8px] bg-greenLight p-[2px] sm:w-auto">
                 {(seasonsQuery.data?.data ?? [
                   { id: 'kharif', label: 'Kharif' },
                   { id: 'rabi', label: 'Rabi' },
                 ]).map((season) => (
                   <button
                     key={season.id}
-                    className={`flex h-[22px] items-center justify-center rounded-[6px] px-[30px] font-montserrat text-[12px] font-medium transition ${
+                    className={`flex h-[22px] flex-1 items-center justify-center rounded-[6px] px-[18px] font-montserrat text-[12px] font-medium transition sm:flex-none sm:px-[30px] ${
                       state.season === season.id ? 'bg-greenDarkActive text-white' : 'text-greenDarkActive'
                     }`}
                     onClick={() => dispatch({ type: 'setSeason', payload: season.id })}
@@ -160,7 +160,7 @@ export function CropPlanningClient() {
             </div>
           </div>
 
-          <div className="mt-5 shrink-0 rounded-[20px] border border-greenLight bg-white px-6 py-5 shadow-[0_1px_0_rgba(0,0,0,0.02)] lg:px-8">
+          <div className="mt-5 shrink-0 rounded-[20px] border border-greenLight bg-white px-4 py-5 shadow-[0_1px_0_rgba(0,0,0,0.02)] sm:px-6 lg:px-8">
             <div className="flex items-center gap-[8px]">
               <div className="font-montserrat text-[12px] font-semibold leading-[130%] text-black/60 whitespace-nowrap">
                 Select Crop Type
@@ -195,7 +195,7 @@ export function CropPlanningClient() {
             </div>
           </div>
 
-          <div className="mt-5 flex min-h-0 flex-1 flex-col rounded-[24px] border border-greenLight bg-panel px-6 py-5 lg:px-8 lg:py-6">
+          <div className="mt-5 flex min-h-0 flex-1 flex-col rounded-[24px] border border-greenLight bg-panel px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
             <div className="mb-4 shrink-0 font-montserrat text-[12px] font-semibold text-black/70">Complete Cost Calculator</div>
             {state.lines.length ? (
               <div className="w-full flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -336,7 +336,7 @@ export function CropPlanningClient() {
 
             <div className="mt-5 mb-4 h-[1px] w-full shrink-0 bg-black/12 lg:mt-6"></div>
 
-            <div className="flex shrink-0 flex-col items-end gap-5 lg:gap-8">
+            <div className="flex shrink-0 flex-col items-stretch gap-5 sm:items-end lg:gap-8">
               <div className="flex flex-col items-start gap-[8px]">
                 <div className="font-montserrat text-[12px] font-medium text-black">Grand Total</div>
                 <div className="flex h-[40px] min-w-[152px] items-center justify-start rounded-[10px] bg-greenLightActive px-[14px] py-[7px]">
@@ -346,7 +346,7 @@ export function CropPlanningClient() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <Button
                   variant="secondary"
                   size="medium"

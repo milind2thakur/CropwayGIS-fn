@@ -4,7 +4,7 @@
 
 import { AlertTriangle, ArrowRight, Check, Plus, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 import { FertilizerCalculatorModal } from './FertilizerCalculatorModal';
@@ -251,7 +251,7 @@ function TaskCalendar() {
 
       <div className="px-[4px] pt-[10px]">
         <div className="mb-[8px] px-[24px] font-montserrat text-[16px] font-medium text-black">May</div>
-        <div className="grid grid-cols-[repeat(7,114px)] justify-between gap-y-[10px]">
+        <div className="grid grid-cols-[repeat(7,minmax(96px,114px))] justify-between gap-y-[10px] overflow-x-auto pb-2">
           {tasks.map((task, index) => (
             <CalendarCard
               key={`${task.day}-${index}`}
@@ -309,7 +309,7 @@ function Backlogs() {
   return (
     <section className="border-t border-black/10 bg-white px-[28px] pt-[14px]">
       <h2 className="mb-[12px] font-montserrat text-[16px] font-medium text-black">Backlogs</h2>
-      <div className="grid grid-cols-[repeat(7,114px)] justify-between gap-y-[10px]">
+      <div className="grid grid-cols-[repeat(7,minmax(96px,114px))] justify-between gap-y-[10px] overflow-x-auto pb-2">
         {items.map((task, index) => (
           <CalendarCard key={`${task.day}-${index}`} task={task} />
         ))}
@@ -505,7 +505,7 @@ function DetectionResultPage({
             </button>
           </div>
 
-          <div className="grid grid-cols-[510px_1fr] gap-[24px]">
+          <div className="grid grid-cols-1 gap-[24px] lg:grid-cols-[minmax(320px,510px)_1fr]">
             <div>
               <div className="relative h-[412px] overflow-hidden rounded-[20px] bg-[#C6D8BD]">
                 <img src={imageUrl} alt="Uploaded diseased leaf" className="h-full w-full object-cover" />
@@ -530,7 +530,7 @@ function DetectionResultPage({
               {result.products.length > 0 && (
                 <>
                   <h3 className="mt-[28px] font-montserrat text-[20px] font-medium leading-[130%] text-black">Featured Products</h3>
-                  <div className="mt-[4px] flex gap-[7px]">
+                  <div className="mt-[4px] flex gap-[7px] overflow-x-auto pb-2">
                     {result.products.map((p, i) => (
                       <ProductCard key={i} name={p.name} />
                     ))}
@@ -591,7 +591,7 @@ function DetectionProcessingPage({ selectedCrop }: { selectedCrop: string }) {
           </div>
 
           <div className="rounded-[21px] border border-dashed border-[#407327] bg-[#EDF2EA] px-[20px] py-[30px]">
-            <div className="mx-auto w-[360px]">
+            <div className="mx-auto w-full max-w-[360px]">
               <div className="mb-[22px] flex h-[34px] items-center justify-between rounded-[6px] bg-[#356020] px-[12px] font-montserrat text-[12px] font-medium text-white">
                 <span>{selectedCrop}</span>
                 <span>⌄</span>
@@ -610,12 +610,12 @@ function DetectionProcessingPage({ selectedCrop }: { selectedCrop: string }) {
 
         <section className="mt-[20px] min-h-[462px] rounded-[20px] bg-white px-[36px] py-[22px]">
           <h2 className="font-montserrat text-[20px] font-medium leading-[130%] text-black">Your Crops</h2>
-          <div className="mt-[24px] grid grid-cols-[482px_1fr] gap-[40px]">
+          <div className="mt-[24px] grid grid-cols-1 gap-[40px] lg:grid-cols-[minmax(280px,482px)_1fr]">
             <div className="h-[360px] bg-[#EDF2EA]" />
             <div className="space-y-[14px]">
-              <div className="h-[52px] w-[780px] bg-[#EDF2EA]" />
-              <div className="h-[140px] w-[292px] bg-[#EDF2EA]" />
-              <div className="h-[54px] w-[330px] bg-[#EDF2EA]" />
+              <div className="h-[52px] w-full max-w-[780px] bg-[#EDF2EA]" />
+              <div className="h-[140px] w-full max-w-[292px] bg-[#EDF2EA]" />
+              <div className="h-[54px] w-full max-w-[330px] bg-[#EDF2EA]" />
             </div>
           </div>
         </section>
@@ -763,9 +763,9 @@ export function MonitoringDetectionClient() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] p-[28px]">
-      <div className="grid max-w-[1550px] grid-cols-1 gap-[14px] xl:grid-cols-[1fr_462px]">
-        <div className="min-h-[1010px] overflow-hidden rounded-[20px] bg-white">
+    <div className="min-h-[100dvh] overflow-x-hidden bg-[#F2F2F2] p-3 sm:p-[28px]">
+      <div className="grid w-full max-w-[1550px] grid-cols-1 gap-[14px] xl:grid-cols-[minmax(0,1fr)_462px]">
+        <div className="min-h-0 overflow-hidden rounded-[20px] bg-white xl:min-h-[1010px]">
           <TaskCalendar />
           <Backlogs />
         </div>

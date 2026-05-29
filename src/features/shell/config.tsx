@@ -2,7 +2,7 @@ import {
   Home,
 } from 'lucide-react';
 
-import { type SVGProps } from 'react';
+import { type ReactElement, type SVGProps } from 'react';
 
 function CropPlanningIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -79,15 +79,23 @@ export const productTabs = [
   { label: 'Market Place', href: '/home' },
 ] as const;
 
-export const gisNavItems = [
+type GisNavItem = {
+  label: string;
+  href: string;
+  icon: (props: SVGProps<SVGSVGElement>) => ReactElement;
+  parentHref?: string;
+};
+
+export const gisNavItems: readonly GisNavItem[] = [
   { label: 'Home', href: '/home', icon: Home },
   { label: 'Crop Planning', href: '/crop-planning', icon: CropPlanningIcon },
   { label: 'Monitoring & Detection', href: '/monitoring-detection', icon: SearchLightIcon },
   { label: 'Land Intelligence', href: '/land-intelligence', icon: LandIntelligenceIcon },
+  { label: 'Soil Intelligence', href: '/land-intelligence?view=soil-intelligence', icon: LandIntelligenceIcon, parentHref: '/land-intelligence' },
   { label: 'Climate & Risk', href: '/climate-risk', icon: ClimateRiskIcon },
   { label: 'Supply Chain & Logistics', href: '/supply-chain-logistics', icon: SupplyChainIcon },
   { label: 'Carbon & Sustainability', href: '/carbon-sustainability', icon: CarbonSustainabilityIcon },
-] as const;
+];
 
 export const nextStepHref = '/crop-planning?step=selection';
 

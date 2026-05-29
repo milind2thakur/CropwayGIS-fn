@@ -24,6 +24,7 @@ import {
   getLandCover,
   getSavedGisAreas,
   getSoilInfo,
+  getSoilIntelligence,
   getSoilPolygon,
   saveGisArea,
   searchLocations,
@@ -37,6 +38,17 @@ import {
   type SavedGisArea,
   type SoilPolygonProperties,
 } from '@/lib/api/land-intelligence';
+import {
+  DEFAULT_SOIL_DEPTH,
+  SOIL_DEPTH_OPTIONS,
+  SOIL_KPI_DISPLAY,
+  SOURCE_BADGE_CLASS,
+  SOURCE_LABEL,
+  UNCERTAINTY_BADGE_CLASS,
+  type SoilDepthValue,
+  type SoilInfoEnvelope,
+  type SoilKpiKey,
+} from './soilIntelligence.types';
 import { cn } from '@/lib/utils';
 
 declare global {
@@ -397,7 +409,7 @@ function GisLayerControls({
   ];
 
   return (
-    <div className="absolute left-6 top-[84px] z-[1000] flex w-[240px] flex-col gap-2 rounded-[14px] border border-white bg-white/85 p-2 shadow-sm backdrop-blur-[12px]">
+    <div className="absolute left-3 right-3 top-[84px] z-[1000] flex max-h-[38dvh] flex-col gap-2 overflow-y-auto rounded-[14px] border border-white bg-white/85 p-2 shadow-sm backdrop-blur-[12px] sm:left-6 sm:right-auto sm:w-[240px] sm:max-h-none">
       {items.map((item) => (
         <button
           key={item.label}
@@ -458,7 +470,7 @@ function ActiveTargetPanel({
   const landCoverLabel = LAND_COVER_OPTIONS.find((option) => option.value === landCoverType)?.label ?? 'Land cover';
 
   return (
-    <div className="absolute left-6 top-[390px] z-[1000] w-[240px] rounded-[14px] border border-white bg-white/85 p-3 shadow-sm backdrop-blur-[12px]">
+    <div className="absolute left-3 right-3 top-[410px] z-[1000] rounded-[14px] border border-white bg-white/85 p-3 shadow-sm backdrop-blur-[12px] sm:left-6 sm:right-auto sm:top-[390px] sm:w-[240px]">
       <div className="flex items-center justify-between gap-3">
         <span className="font-montserrat text-[10px] font-bold uppercase tracking-[0.08em] text-greenDark">
           Active Target
@@ -482,23 +494,84 @@ function ActiveTargetPanel({
   );
 }
 
+// ── Soil Intelligence Panel (SoilGrids-aware) ──────────────────────────────
+
+function UncertaintyBadgeChip({ level }: { level: string }) {
+  const cls = UNCERTAINTY_BADGE_CLASS[level as keyof typeof UNCERTAINTY_BADGE_CLASS]
+    ?? 'bg-gray-100 text-gray-600';
+  return (
+    <span className={cn('rounded-full px-2 py-[2px] font-montserrat text-[9px] font-bold capitalize', cls)}>
+      {level}
+    </span>
+  );
+}
+
+function KpiBlock({ kpiKey, entry }: { kpiKey: SoilKpiKey; entry: NonNullable<SoilInfoEnvelope['kpis']>[SoilKpiKey] }) {
+  if (!entry) return null;
+  const meta = SOIL_KPI_DISPLAY[kpiKey];
+  const displayValue = kpiKey === 'texture'
+    ? String(entry.value ?? '—')
+    : entry.value != null ? Number(entry.value).toFixed(2) : '—';
+
+  return (
+    <div className="flex flex-col gap-[3px] rounded-[10px] bg-greenLight/60 p-3">
+      <div className="flex items-center justify-between">
+        <span className="font-montserrat text-[10px] font-bold text-greenDark">{meta.label}</span>
+        <UncertaintyBadgeChip level={entry.uncertainty_badge} />
+      </div>
+      <div className="flex items-end gap-1">
+        <span className="font-montserrat text-[20px] font-bold leading-none text-ink">{displayValue}</span>
+        {meta.unit && (
+          <span className="mb-[2px] font-montserrat text-[10px] font-medium text-muted">{meta.unit}</span>
+        )}
+      </div>
+      {entry.q05 != null && entry.q95 != null && (
+        <div className="mt-[2px] font-montserrat text-[9px] text-muted">
+          Range: {Number(entry.q05).toFixed(2)} – {Number(entry.q95).toFixed(2)}
+          {meta.unit ? ` ${meta.unit}` : ''}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SoilIntelligencePanel({
   soilFeature,
   soilInfo,
   loading,
   error,
+  selectedDepth,
+  onDepthChange,
+  advancedMode,
 }: {
   soilFeature: GeoJsonFeature<SoilPolygonProperties> | null;
   soilInfo: unknown;
   loading: boolean;
   error: string | null;
+  selectedDepth: SoilDepthValue;
+  onDepthChange: (depth: SoilDepthValue) => void;
+  advancedMode: boolean;
 }) {
   if (!loading && !error && !soilFeature && !soilInfo) {
     return null;
   }
 
+  // Detect normalised envelope (from SoilGrids service) vs legacy node data
+  const envelope = (
+    soilInfo &&
+    typeof soilInfo === 'object' &&
+    !Array.isArray(soilInfo) &&
+    'source' in (soilInfo as object)
+  ) ? (soilInfo as SoilInfoEnvelope) : null;
+
+  const hasKpis = envelope?.kpis && Object.keys(envelope.kpis).length > 0;
+  const isStale = envelope?.source === 'soilgrids_cached_stale';
+  const hasAdvisory = Boolean(envelope?.advisory);
+
+  // Fallback to legacy node data display
+  const legacyData = envelope?.node_data ?? soilInfo;
   const props = soilFeature?.properties;
-  const soilRecord = getSoilInfoRecord(soilInfo);
+  const soilRecord = getSoilInfoRecord(legacyData);
   const rows = [
     ['Dominant soil', props?.Dom_Soil],
     ['Soil symbol', props?.Dom_Soil_Sym],
@@ -517,29 +590,129 @@ function SoilIntelligencePanel({
   ].filter(([, value]) => value !== undefined && value !== null && value !== '');
 
   return (
-    <div className="absolute right-6 top-[84px] z-[1000] max-h-[calc(100vh-132px)] w-[300px] overflow-y-auto rounded-[18px] border border-white bg-white/90 p-4 shadow-sm backdrop-blur-[12px]">
-      <div className="font-montserrat text-[14px] font-semibold text-ink">Soil Intelligence</div>
+    <div className={cn(
+      "absolute bottom-3 left-3 right-3 z-[1000] max-h-[42dvh] overflow-y-auto rounded-[18px] border p-4 shadow-sm backdrop-blur-[12px] md:bottom-auto md:left-auto md:right-6 md:top-[84px] md:max-h-[calc(100dvh-132px)] md:w-[300px]",
+      advancedMode
+        ? "border-white/10 bg-[#25282c]/90 text-white shadow-[0_12px_34px_rgba(0,0,0,0.35)]"
+        : "border-white bg-white/90"
+    )}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className={cn("font-montserrat text-[14px] font-semibold", advancedMode ? "text-white" : "text-ink")}>Soil Intelligence</div>
+        {envelope?.source && (
+          <span className={cn(
+            'rounded-full px-2 py-[2px] font-montserrat text-[9px] font-bold',
+            SOURCE_BADGE_CLASS[envelope.source]
+          )}>
+            {SOURCE_LABEL[envelope.source]}
+          </span>
+        )}
+      </div>
+
+      {/* Stale cache warning */}
+      {isStale && (
+        <div className="mt-2 flex items-center gap-2 rounded-[8px] bg-amber-50 px-3 py-2">
+          <span className="text-[10px] text-amber-700 font-montserrat font-medium">
+            ⚠ Cached data
+            {envelope?.last_updated
+              ? ` · updated ${new Date(envelope.last_updated).toLocaleDateString()}`
+              : ''}
+          </span>
+        </div>
+      )}
+
       {loading ? (
         <p className="mt-2 font-montserrat text-[12px] text-muted">Loading soil layer and profile...</p>
       ) : null}
       {error ? (
         <p className="mt-2 rounded-[8px] bg-red-50 px-3 py-2 font-montserrat text-[12px] text-red-700">{error}</p>
       ) : null}
+
       {!loading && !error ? (
         <div className="mt-3 flex flex-col gap-3">
-          <div className="font-montserrat text-[10px] font-bold uppercase tracking-[0.08em] text-greenDark">
-            Soil Summary
+
+          {/* ── Depth Selector ── */}
+          {advancedMode ? (
+          <div>
+            <div className={cn("mb-[5px] font-montserrat text-[10px] font-bold uppercase tracking-[0.08em]", advancedMode ? "text-green-300" : "text-greenDark")}>
+              Depth
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {SOIL_DEPTH_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => onDepthChange(opt.value)}
+                  className={cn(
+                    'rounded-[6px] px-2 py-[3px] font-montserrat text-[10px] font-semibold transition',
+                    selectedDepth === opt.value
+                      ? 'bg-greenDark text-white'
+                      : advancedMode
+                        ? 'bg-white/10 text-white hover:bg-white/15'
+                        : 'bg-greenLight text-ink hover:bg-greenDark/20'
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          ) : null}
+
+          {/* ── KPI Block (SoilGrids) ── */}
+          {advancedMode && hasKpis && envelope?.kpis && (
+            <>
+              <div className={cn("font-montserrat text-[10px] font-bold uppercase tracking-[0.08em]", advancedMode ? "text-green-300" : "text-greenDark")}>
+                Soil KPIs · {SOIL_DEPTH_OPTIONS.find(o => o.value === (envelope.depth ?? selectedDepth))?.label ?? selectedDepth}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.keys(envelope.kpis) as SoilKpiKey[]).map((kpiKey) => (
+                  <KpiBlock key={kpiKey} kpiKey={kpiKey} entry={envelope.kpis?.[kpiKey]} />
+                ))}
+              </div>
+
+              {/* Advisory */}
+              {hasAdvisory && (
+                <div className={cn("rounded-[8px] px-3 py-2 font-montserrat text-[10px] font-medium", advancedMode ? "bg-white/10 text-green-200" : "bg-blue-50 text-blue-700")}>
+                  ℹ {envelope.advisory}
+                </div>
+              )}
+
+              {/* Warnings */}
+              {envelope.warnings && envelope.warnings.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  {envelope.warnings.map((w, i) => (
+                    <div key={i} className="rounded-[8px] bg-amber-50 px-3 py-2 font-montserrat text-[10px] text-amber-700">
+                      {w}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Last updated */}
+              {envelope.last_updated && !isStale && (
+                <div className={cn("text-right font-montserrat text-[9px]", advancedMode ? "text-white/70" : "text-muted")}>
+                  Updated {new Date(envelope.last_updated).toLocaleString()}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Legacy Soil Summary (always shown for context) ── */}
+          <div className={cn("font-montserrat text-[10px] font-bold uppercase tracking-[0.08em]", advancedMode ? "text-green-300" : "text-greenDark")}>
+            {hasKpis ? 'Soil Classification' : 'Soil Summary'}
           </div>
           {rows.map(([label, value]) => (
             <div key={label} className="flex items-start justify-between gap-3 border-b border-lineLight pb-1 last:border-0">
-              <span className="font-montserrat text-[11px] font-medium text-muted">{label}</span>
-              <span className="max-w-[150px] text-right font-montserrat text-[11px] font-semibold text-ink">
+              <span className={cn("font-montserrat text-[11px] font-medium", advancedMode ? "text-white/70" : "text-muted")}>{label}</span>
+              <span className={cn("max-w-[150px] text-right font-montserrat text-[11px] font-semibold", advancedMode ? "text-white" : "text-ink")}>
                 {formatSoilInfoValue(value)}
               </span>
             </div>
           ))}
+
           {profileRows.length > 0 ? (
-            <div className="mt-1 flex flex-col gap-2 rounded-[10px] bg-greenLight/70 p-3">
+            <div className={cn("mt-1 flex flex-col gap-2 rounded-[10px] p-3", advancedMode ? "bg-white/10" : "bg-greenLight/70")}>
               <div className="font-montserrat text-[10px] font-bold uppercase tracking-[0.08em] text-greenDark">
                 Soil Profile
               </div>
@@ -552,7 +725,7 @@ function SoilIntelligencePanel({
                 </div>
               ))}
             </div>
-          ) : soilInfo ? (
+          ) : legacyData && !hasKpis ? (
             <div className="rounded-[8px] bg-greenLight px-3 py-2 font-montserrat text-[11px] font-medium text-greenDark">
               Detailed soil profile returned, but no displayable profile fields were found.
             </div>
@@ -577,7 +750,7 @@ function SelectionSidebar({
   onSave: () => void;
 }) {
   return (
-    <div className="flex w-[254px] shrink-0 flex-col border-l border-line bg-white">
+    <div className="flex w-full shrink-0 flex-col overflow-y-auto border-t border-line bg-white lg:w-[254px] lg:border-l lg:border-t-0">
       <div className="flex flex-col px-[10px] pb-[8px] pt-[10px]">
         <div className="flex flex-col gap-[6px]">
           <div className="font-montserrat text-[10px] font-medium leading-[130%] text-muted">
@@ -674,6 +847,7 @@ function SaveSelectionModal({
   const [landId, setLandId] = useState("001");
 
   // Dynamically update default Land Id when polygons change
+
   useEffect(() => {
     if (isOpen) {
       if (polygons.length > 0) {
@@ -781,11 +955,11 @@ function SaveSelectionModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-ink/40 backdrop-blur-sm">
-      <div className="w-[600px] rounded-[24px] bg-white p-4 shadow-2xl">
-        <div className="flex gap-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-ink/40 p-3 backdrop-blur-sm">
+      <div className="w-full max-w-[600px] rounded-[24px] bg-white p-4 shadow-2xl">
+        <div className="flex flex-col gap-4 sm:flex-row">
           {/* Left: Map Preview card inset inside padding */}
-          <div className="relative h-[250px] w-[250px] shrink-0 overflow-hidden rounded-[16px] bg-canvas">
+          <div className="relative h-[220px] w-full shrink-0 overflow-hidden rounded-[16px] bg-canvas sm:h-[250px] sm:w-[250px]">
             <div ref={previewMapRef} className="h-full w-full z-0" />
           </div>
 
@@ -811,7 +985,7 @@ function SaveSelectionModal({
                 </div>
 
                 {/* Land Id & Selection Area Row */}
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <div className="flex-1">
                     <label className="mb-1 block font-montserrat text-[11px] font-medium text-muted">
                       Land Id
@@ -1015,7 +1189,7 @@ function CropPlanningSidebar({
   const filteredCrops = crops.filter(c => c.toLowerCase().includes(searchCrop.toLowerCase()));
 
   return (
-    <div className="flex w-[254px] shrink-0 flex-col border-l border-line bg-white relative">
+    <div className="relative flex w-full shrink-0 flex-col overflow-y-auto border-t border-line bg-white lg:w-[254px] lg:border-l lg:border-t-0">
       <div className="flex flex-col px-[10px] pb-[8px] pt-[14px]">
         
         {/* Saved Land Parcel */}
@@ -1175,20 +1349,21 @@ function CropPlanningSidebar({
              </div>
           </div>
         </div>
-
       </div>
     </div>
   );
 }
 
 
-type LandIntelligenceClientProps = {
+export interface LandIntelligenceClientProps {
   mode?: 'land-intelligence' | 'crop-planning-selection';
+  initialView?: 'soil-intelligence';
 };
 
-export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntelligenceClientProps) {
+export function LandIntelligenceClient({ mode = 'land-intelligence', initialView }: LandIntelligenceClientProps) {
   const isCropPlanningSelection = mode === 'crop-planning-selection';
   const showGisIntelligence = !isCropPlanningSelection;
+  const soilIntelligenceAdvanced = initialView === 'soil-intelligence';
   const showSelectionSidebar = isCropPlanningSelection;
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [sidebarMode, setSidebarMode] = useState<'selection' | 'crop-planning'>('selection');
@@ -1203,13 +1378,37 @@ export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntel
   const [landCoverCollection, setLandCoverCollection] = useState<LandCoverFeatureCollection | null>(null);
   const [selectedSoilFeature, setSelectedSoilFeature] = useState<GeoJsonFeature<SoilPolygonProperties> | null>(null);
   const [soilInfo, setSoilInfo] = useState<unknown>(null);
+  const [selectedSoilDepth, setSelectedSoilDepth] = useState<SoilDepthValue>(DEFAULT_SOIL_DEPTH);
   const [soilLoading, setSoilLoading] = useState(false);
   const [landCoverLoading, setLandCoverLoading] = useState(false);
   const [soilError, setSoilError] = useState<string | null>(null);
   const [landCoverError, setLandCoverError] = useState<string | null>(null);
   const [savedAreas, setSavedAreas] = useState<SavedGisArea[]>([]);
   const [savedAreaError, setSavedAreaError] = useState<string | null>(null);
-  
+  const [mapType, setMapType] = useState<MapTypeId>('roadmap');
+  const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(16);
+  const [activeTool, setActiveTool] = useState<MapTool>('cursor');
+  const [polygonCoordsList, setPolygonCoordsList] = useState<PolygonSelection[]>([
+    { id: '001', coords: SELECTION_PATH },
+  ]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawingCoords, setDrawingCoords] = useState<Coord[]>([]);
+  const [pins, setPins] = useState<Coord[]>([]);
+  const [mousePos, setMousePos] = useState<Coord | null>(null);
+  const [measurePoints, setMeasurePoints] = useState<Coord[]>([]);
+  const [soilQueryTarget, setSoilQueryTarget] = useState<SoilQueryTarget | null>({
+    type: 'polygon',
+    centroid: getPolygonCentroid(SELECTION_PATH),
+    radiusKm: getSoilRadiusKm(SELECTION_PATH),
+    polygonId: '001',
+  });
+  const [searchQuery, setSearchQuery] = useState(DEFAULT_LOCATION_LABEL);
+  const [suggestions, setSuggestions] = useState<GeocodingResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+
   const handleSaveConfirm = (landId: string, owner: string) => {
     setSavedLandData({ id: landId, owner });
     void saveGisArea({
@@ -1229,36 +1428,8 @@ export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntel
     setSidebarMode('crop-planning');
   };
 
-  const [mapType, setMapType] = useState<MapTypeId>('roadmap');
-  const [mapReady, setMapReady] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(16);
-  const [activeTool, setActiveTool] = useState<MapTool>('cursor');
-
-  // Use states for polygon and markers
-  const [polygonCoordsList, setPolygonCoordsList] = useState<PolygonSelection[]>([
-    { id: '001', coords: SELECTION_PATH }
-  ]);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [drawingCoords, setDrawingCoords] = useState<Coord[]>([]);
-  const [pins, setPins] = useState<Coord[]>([]);
-  const [mousePos, setMousePos] = useState<Coord | null>(null);
-  const [measurePoints, setMeasurePoints] = useState<Coord[]>([]);
-  const [soilQueryTarget, setSoilQueryTarget] = useState<SoilQueryTarget | null>({
-    type: 'polygon',
-    centroid: getPolygonCentroid(SELECTION_PATH),
-    radiusKm: getSoilRadiusKm(SELECTION_PATH),
-    polygonId: '001',
-  });
-
-  // Search state
-  const [searchQuery, setSearchQuery] = useState(DEFAULT_LOCATION_LABEL);
-  const [suggestions, setSuggestions] = useState<GeocodingResult[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
-
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const polygonRefs = useRef<any[]>([]);
@@ -1308,7 +1479,7 @@ export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntel
     fitSelectionBounds();
   };
 
-  const fetchSoilIntelligence = useCallback(async (targetOverride?: SoilQueryTarget) => {
+  const fetchSoilIntelligence = useCallback(async (targetOverride?: SoilQueryTarget, depthOverride?: SoilDepthValue) => {
     const fallbackCenter = mapRef.current?.getCenter?.();
     const target = targetOverride ?? soilQueryTarget ?? {
       type: 'map-center',
@@ -1329,7 +1500,14 @@ export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntel
 
       const soilId = findFirstSoilGlobalId(soilResponse.data);
       if (soilId) {
-        const infoResponse = await getSoilInfo(soilId);
+        const infoResponse = soilIntelligenceAdvanced
+          ? await getSoilIntelligence(soilId, {
+            lat: coord.lat,
+            lon: coord.lng,
+            radius: target.radiusKm,
+            depth: depthOverride ?? selectedSoilDepth,
+          }).catch(() => getSoilInfo(soilId))
+          : await getSoilInfo(soilId);
         setSoilInfo(infoResponse.data);
       } else {
         setSoilInfo(null);
@@ -1339,7 +1517,7 @@ export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntel
     } finally {
       setSoilLoading(false);
     }
-  }, [polygonCoordsList, soilQueryTarget]);
+  }, [polygonCoordsList, selectedSoilDepth, soilIntelligenceAdvanced, soilQueryTarget]);
 
   const fetchLandCover = useCallback(async (targetOverride?: SoilQueryTarget) => {
     const fallbackCenter = mapRef.current?.getCenter?.();
@@ -2056,8 +2234,8 @@ export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntel
   }, [mapReady, showSavedAreas, savedAreas]);
 
   return (
-    <div className="relative flex h-full min-h-[720px] w-full overflow-hidden bg-panel">
-      <div className="relative flex-1">
+    <div className="relative flex h-full min-h-[calc(100dvh-64px)] w-full flex-col overflow-hidden bg-panel lg:min-h-[720px] lg:flex-row">
+      <div className="relative min-h-[calc(100dvh-64px)] flex-1 lg:min-h-0">
         <div ref={mapContainerRef} className="absolute inset-0" />
 
         {!mapReady && !mapError ? (
@@ -2069,7 +2247,7 @@ export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntel
         ) : null}
 
         {/* Live Coordinates (Top Right) */}
-        <div className="absolute right-6 top-6 z-[1000] flex items-center justify-center rounded-[10px] border border-white bg-white/80 px-[14px] py-[10px] shadow-sm backdrop-blur-[12px]">
+        <div className="absolute right-3 top-[74px] z-[1000] hidden items-center justify-center rounded-[10px] border border-white bg-white/80 px-[14px] py-[10px] shadow-sm backdrop-blur-[12px] sm:right-6 sm:top-6 sm:flex">
           <span ref={liveCoordRef} className="font-montserrat text-[12px] font-medium leading-[130%] text-muted tracking-wide">
             Lat: -, Lng: -
           </span>
@@ -2084,7 +2262,7 @@ export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntel
           </div>
         ) : null}
 
-        <div className="absolute left-6 top-6 z-[1000] w-[417px]" ref={searchContainerRef}>
+        <div className="absolute left-3 right-3 top-3 z-[1000] sm:left-6 sm:right-auto sm:top-6 sm:w-[min(417px,calc(100vw-320px))] lg:w-[417px]" ref={searchContainerRef}>
           <div className="relative">
             {/* Glassmorphism container matching Figma */}
             <div className="flex h-[46px] w-full items-center gap-[10px] rounded-[10px] border border-white bg-white/20 px-[14px] shadow-sm backdrop-blur-[12px] outline-none focus-within:outline-none focus-within:ring-0">
@@ -2186,13 +2364,21 @@ export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntel
               soilInfo={soilInfo}
               loading={soilLoading}
               error={soilError ?? landCoverError ?? savedAreaError}
+              selectedDepth={selectedSoilDepth}
+              advancedMode={soilIntelligenceAdvanced}
+              onDepthChange={(depth) => {
+                setSelectedSoilDepth(depth);
+                if (soilInfo && soilIntelligenceAdvanced) {
+                  void fetchSoilIntelligence(undefined, depth);
+                }
+              }}
             />
           </>
         ) : null}
 
         <MapScaleBar map={mapRef.current} color={mapType === 'satellite' ? 'white' : 'black'} />
 
-        <div className="absolute bottom-6 right-8 z-[1000] flex gap-3 drop-shadow-[0_0_10px_rgba(0,0,0,0.06)]">
+        <div className="absolute bottom-4 right-4 z-[1000] flex gap-3 drop-shadow-[0_0_10px_rgba(0,0,0,0.06)] sm:bottom-6 sm:right-8">
           <button
             type="button"
             className="relative h-[52px] w-[52px] overflow-hidden rounded-[4px] border-2 border-white shadow-md transition hover:scale-105"
@@ -2254,32 +2440,32 @@ export function LandIntelligenceClient({ mode = 'land-intelligence' }: LandIntel
         </div>
 
         {activeTool === 'draw' && (
-          <div className="absolute bottom-[85px] left-1/2 z-[1000] -translate-x-1/2">
-            <span className="rounded-full border border-line bg-white/90 px-4 py-1.5 text-[11px] font-medium shadow-sm backdrop-blur-sm">
+          <div className="absolute bottom-[85px] left-3 right-3 z-[1000] text-center sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+            <span className="inline-flex rounded-full border border-line bg-white/90 px-4 py-1.5 text-[11px] font-medium shadow-sm backdrop-blur-sm">
               Click points on the map, then click near the first point or press Escape to finish
             </span>
           </div>
         )}
 
         {activeTool === 'probe' && (
-          <div className="absolute bottom-[85px] left-1/2 z-[1000] -translate-x-1/2">
-            <span className="rounded-full border border-line bg-white/90 px-4 py-1.5 text-[11px] font-medium shadow-sm backdrop-blur-sm">
+          <div className="absolute bottom-[85px] left-3 right-3 z-[1000] text-center sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+            <span className="inline-flex rounded-full border border-line bg-white/90 px-4 py-1.5 text-[11px] font-medium shadow-sm backdrop-blur-sm">
               Click any map point to fetch soil intelligence
             </span>
           </div>
         )}
 
         {activeTool === 'measure' && (
-          <div className="absolute bottom-[85px] left-1/2 z-[1000] -translate-x-1/2">
-            <span className="rounded-full border border-line bg-white/90 px-4 py-1.5 text-[11px] font-medium shadow-sm backdrop-blur-sm">
+          <div className="absolute bottom-[85px] left-3 right-3 z-[1000] text-center sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+            <span className="inline-flex rounded-full border border-line bg-white/90 px-4 py-1.5 text-[11px] font-medium shadow-sm backdrop-blur-sm">
               Click two map points to measure distance
             </span>
           </div>
         )}
 
         {canRemoveByClick && polygonCoordsList.length > 0 && (
-          <div className="absolute bottom-[85px] left-1/2 z-[1000] -translate-x-1/2">
-            <span className="rounded-full border border-line bg-white/90 px-4 py-1.5 text-[11px] font-medium shadow-sm backdrop-blur-sm">
+          <div className="absolute bottom-[85px] left-3 right-3 z-[1000] text-center sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+            <span className="inline-flex rounded-full border border-line bg-white/90 px-4 py-1.5 text-[11px] font-medium shadow-sm backdrop-blur-sm">
               Double click a polygon to remove it
             </span>
           </div>

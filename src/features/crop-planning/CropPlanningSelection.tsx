@@ -4,15 +4,18 @@ import { MapPin, X, CalendarDays, ChevronDown, ChevronRight } from 'lucide-react
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
 import { MapScaleBar } from '@/components/ui/map-scale-bar';
 import { cn } from '@/lib/utils';
 import { useCropPlanDraft } from './useCropPlanDraft';
-import { getSeasons, getCrops } from '@/lib/api/crop-planning';
+import { getCrops } from '@/lib/api/crop-planning';
 import { useQuery } from '@tanstack/react-query';
 
 const DEFAULT_LOCATION_LABEL = 'Kendri, Dhamtari Rd, Raipur, CG';
 const DEFAULT_CENTER = { lat: 21.2517, lng: 81.6304 };
+type LeafletSelectionMap = {
+  remove: () => void;
+  panTo: (coords: [number, number]) => void;
+};
 
 // Hardcoded polygon from LandIntelligence
 const SELECTION_PATH = [
@@ -21,29 +24,12 @@ const SELECTION_PATH = [
   { lat: 21.2512, lng: 81.631 },
 ];
 
-function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={cn(
-        'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-        className
-      )}
-      {...props}
-    />
-  );
-}
-
 export function CropPlanningSelection({
   onContinue,
 }: {
   onContinue: () => void;
 }) {
   const { state, dispatch } = useCropPlanDraft();
-  
-  const seasonsQuery = useQuery({
-    queryKey: ['seasons'],
-    queryFn: getSeasons,
-  });
   
   const cropsQuery = useQuery({
     queryKey: ['crops', state.season, state.search],
@@ -57,7 +43,7 @@ export function CropPlanningSelection({
   const [mapError, setMapError] = useState<string | null>(null);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<LeafletSelectionMap | null>(null);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -144,9 +130,9 @@ export function CropPlanningSelection({
   };
 
   return (
-    <div className="relative flex h-full min-h-[720px] w-full overflow-hidden bg-[#E5E5E5]">
+    <div className="relative flex h-full min-h-[calc(100dvh-64px)] w-full flex-col overflow-hidden bg-[#E5E5E5] lg:min-h-[720px] lg:flex-row">
       {/* Map Area */}
-      <div className="relative flex-1">
+      <div className="relative min-h-[calc(100dvh-64px)] flex-1 lg:min-h-0">
         <div ref={mapContainerRef} className="absolute inset-0" />
         
         {!mapReady && !mapError && (
@@ -157,7 +143,7 @@ export function CropPlanningSelection({
           </div>
         )}
 
-        <div className="absolute left-6 top-6 z-10 w-[400px]">
+        <div className="absolute left-3 right-3 top-3 z-10 sm:left-6 sm:right-auto sm:top-6 sm:w-[min(400px,calc(100vw-48px))]">
           <div className="relative flex h-[69px] w-full items-center rounded-[8px] border border-white/10 bg-white px-4 shadow-[0_10px_22px_rgba(163,163,163,0.08)]">
             <MapPin className="h-5 w-5 text-black" />
             <input
@@ -168,7 +154,7 @@ export function CropPlanningSelection({
             <button type="button" onClick={recenterMap}>
               <X className="h-5 w-5 text-black opacity-50" />
             </button>
-            <div className="ml-4 flex gap-2">
+            <div className="ml-4 hidden gap-2 sm:flex">
               <button className="flex h-[26px] items-center rounded-[6px] bg-[#CA224E] px-4 font-poppins text-[10px] font-medium text-white">
                 Clear
               </button>
@@ -178,7 +164,7 @@ export function CropPlanningSelection({
             </div>
           </div>
           {/* Sub divisions row */}
-          <div className="mt-2 flex h-[26px] items-center gap-3 opacity-50">
+          <div className="mt-2 hidden h-[26px] items-center gap-3 opacity-50 sm:flex">
             <span className="font-['Geist'] text-[14px] text-[#2D2D2D]">Raipur</span>
             <div className="h-2 w-px bg-black" />
             <span className="font-['Geist'] text-[14px] text-[#2D2D2D]">Raipur City</span>
@@ -187,7 +173,7 @@ export function CropPlanningSelection({
             <div className="h-2 w-px bg-black" />
             <span className="font-['Geist'] text-[14px] text-[#2D2D2D]">Sub-Div 2</span>
           </div>
-          <div className="font-['Geist'] text-[14px] text-[#2D2D2D] opacity-50">
+          <div className="hidden font-['Geist'] text-[14px] text-[#2D2D2D] opacity-50 sm:block">
             11kv Industrial area
           </div>
         </div>
@@ -196,7 +182,7 @@ export function CropPlanningSelection({
       </div>
 
       {/* Details Panel */}
-      <div className="flex w-[254px] shrink-0 flex-col bg-white">
+      <div className="flex w-full shrink-0 flex-col overflow-y-auto border-t border-black/10 bg-white lg:w-[254px] lg:border-t-0">
         {/* Saved Land Parcel Section */}
         <div className="flex flex-col items-center pt-3 pb-4">
           <div className="font-montserrat text-[10px] font-medium opacity-70 mb-[11px]">

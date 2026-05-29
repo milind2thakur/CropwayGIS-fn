@@ -98,7 +98,7 @@ function ProfileDropdown() {
         <div
           ref={panelRef}
           style={{ top: dropPos.top, right: dropPos.right }}
-          className="fixed z-[300] w-[220px] rounded-[14px] border border-black/10 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.14)]"
+          className="fixed z-[300] w-[min(220px,calc(100vw-24px))] rounded-[14px] border border-black/10 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.14)]"
         >
           {/* User info header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-black/8">
@@ -206,7 +206,7 @@ function ProductTopNav({
   ];
 
   return (
-    <header className="flex h-[49px] w-full border-b border-black/20 bg-white">
+    <header className="flex h-[49px] w-full min-w-0 border-b border-black/20 bg-white">
       <div
         className={cn(
           'flex h-full shrink-0 items-center',
@@ -242,8 +242,8 @@ function ProductTopNav({
           </div>
         )}
       </div>
-      <div className="flex min-w-0 flex-1 items-center justify-between pr-[20px] pl-0">
-        <nav className="flex h-[43px] items-center gap-[22px]">
+      <div className="flex min-w-0 flex-1 items-center justify-between overflow-hidden pr-[20px] pl-0">
+        <nav className="flex h-[43px] min-w-0 items-center gap-[22px] overflow-x-auto">
           <ProductDivider />
           {productNavItems.map((item, index) => {
             const active = item.activePaths.includes(pathname);
@@ -307,7 +307,7 @@ function Sidebar({
       >
         {gisNavItems.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.href;
+          const active = pathname === item.href || (item.parentHref && pathname === item.parentHref);
           return (
             <Link
               key={item.href}
@@ -320,7 +320,10 @@ function Sidebar({
                   : 'text-black/65 hover:bg-greenLight hover:text-ink',
                 collapsed
                   ? 'flex h-9 w-9 items-center justify-center rounded-[4px]'
-                  : 'flex h-[34px] w-full max-w-[209px] items-center gap-[10px] rounded-[4px] px-[10px] py-[5px] text-[12px] font-medium leading-[130%]'
+                  : cn(
+                    'flex h-[34px] w-full max-w-[209px] items-center gap-[10px] rounded-[4px] px-[10px] py-[5px] text-[12px] font-medium leading-[130%]',
+                    item.parentHref ? 'ml-5 w-[calc(100%-20px)]' : ''
+                  )
               )}
               title={collapsed ? item.label : undefined}
             >
@@ -339,14 +342,14 @@ export function GisShell({ children }: { children: ReactNode }) {
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
 
   return (
-    <div className="bg-canvas text-ink">
-      <div className="min-h-screen w-full lg:h-screen lg:min-h-0 lg:overflow-hidden">
+    <div className="min-w-0 overflow-x-hidden bg-canvas text-ink">
+      <div className="min-h-[100dvh] w-full lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
         <div className="hidden lg:block">
           <ProductTopNav collapsed={desktopCollapsed} onToggleSidebar={() => setDesktopCollapsed((value) => !value)} />
         </div>
-        <div className="lg:flex lg:h-[calc(100vh-49px)]">
+        <div className="lg:flex lg:h-[calc(100dvh-49px)]">
           <Sidebar collapsed={desktopCollapsed} />
-          <div className="relative flex min-h-screen min-w-0 flex-1 flex-col lg:h-full lg:min-h-0">
+          <div className="relative flex min-h-[100dvh] min-w-0 flex-1 flex-col lg:h-full lg:min-h-0">
           <div className="border-b border-line bg-white px-4 py-3 lg:hidden">
             <Button variant="secondary" className="gap-2" onClick={() => setMobileOpen(true)}>
               <Menu className="h-4 w-4" />
